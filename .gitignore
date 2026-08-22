@@ -1,0 +1,31 @@
+# Python virtual environment
+.venv/
+
+# Python-generated files
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Environment variables and secrets
+.env
+
+# macOS files
+.DS_Store
+
+# Testing and coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs
+*.log
+
+# Generated experiment data
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Trained machine-learning models
+ml/models/*
+!ml/models/.gitkeep
