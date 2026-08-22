@@ -1,0 +1,26 @@
+# Backend and API
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.30,<1.0
+pydantic-settings>=2.7,<3.0
+
+# Database
+sqlalchemy>=2.0,<3.0
+psycopg[binary]>=3.2,<4.0
+alembic>=1.14,<2.0
+
+# Data science and machine learning
+numpy>=1.26,<3.0
+pandas>=2.2,<3.0
+scikit-learn>=1.5,<2.0
+joblib>=1.4,<2.0
+
+# Dashboard and experiments
+streamlit>=1.41,<2.0
+plotly>=5.24,<7.0
+locust>=2.32,<3.0
+psutil>=6.1,<8.0
+
+# Testing
+pytest>=8.3,<9.0
+pytest-cov>=6.0,<8.0
+httpx>=0.27,<1.0
