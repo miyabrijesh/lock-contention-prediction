@@ -185,3 +185,380 @@ def test_failed_validation_records_attempt(
 
     assert unchanged_seat is not None
     assert unchanged_seat.state == SeatState.AVAILABLE
+def get_another_available_seat(
+    session: Session,
+    *,
+    show_id: int,
+    excluded_seat_id: int,
+) -> Seat:
+    """Return another available seat belonging to the same show."""
+
+    seat = session.scalar(
+        select(Seat)
+        .where(
+            Seat.show_id == show_id,
+            Seat.id != excluded_seat_id,
+            Seat.state == SeatState.AVAILABLE,
+        )
+        .order_by(Seat.id)
+        .limit(1)
+    )
+
+    assert seat is not None
+
+    return seat
+
+
+def test_identical_idempotent_replay_returns_existing_booking(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """Repeating an identical request must not create another booking."""
+
+    synthetic_user, show, seat = get_normal_booking_data(
+        db_session
+    )
+    original_seat_version = seat.version
+    idempotency_key = uuid4()
+
+    request_headers = booking_headers(
+        str(idempotency_key)
+    )
+    request_body = {
+        "user_id": synthetic_user.id,
+        "show_id": show.id,
+        "seat_id": seat.id,
+        "experiment_run_id": None,
+    }
+
+    first_response = client.post(
+        "/api/v1/bookings",
+        headers=request_headers,
+        json=request_body,
+    )
+    second_response = client.post(
+        "/api/v1/bookings",
+        headers=request_headers,
+        json=request_body,
+    )
+
+    assert first_response.status_code == 201
+    assert second_response.status_code == 200
+
+    assert (
+        second_response.headers["Idempotent-Replayed"]
+        == "true"
+    )
+    assert (
+        first_response.json()["id"]
+        == second_response.json()["id"]
+    )
+
+    db_session.expire_all()
+
+    bookings = db_session.scalars(
+        select(Booking).where(
+            Booking.idempotency_key == idempotency_key
+        )
+    ).all()
+    attempts = db_session.scalars(
+        select(BookingAttempt).where(
+            BookingAttempt.idempotency_key
+            == idempotency_key
+        )
+    ).all()
+    updated_seat = db_session.get(Seat, seat.id)
+
+    assert len(bookings) == 1
+    assert len(attempts) == 2
+
+    assert sorted(
+        attempt.http_status
+        for attempt in attempts
+    ) == [200, 201]
+
+    assert all(
+        attempt.outcome == AttemptOutcome.SUCCESS
+        for attempt in attempts
+    )
+    assert all(
+        attempt.error_code is None
+        for attempt in attempts
+    )
+
+    assert updated_seat is not None
+    assert updated_seat.state == SeatState.BOOKED
+    assert updated_seat.version == original_seat_version + 1
+
+
+def test_reused_idempotency_key_with_new_payload_conflicts(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """One idempotency key cannot represent two different requests."""
+
+    synthetic_user, show, first_seat = (
+        get_normal_booking_data(db_session)
+    )
+    second_seat = get_another_available_seat(
+        db_session,
+        show_id=show.id,
+        excluded_seat_id=first_seat.id,
+    )
+    idempotency_key = uuid4()
+    request_headers = booking_headers(
+        str(idempotency_key)
+    )
+
+    first_response = client.post(
+        "/api/v1/bookings",
+        headers=request_headers,
+        json={
+            "user_id": synthetic_user.id,
+            "show_id": show.id,
+            "seat_id": first_seat.id,
+            "experiment_run_id": None,
+        },
+    )
+    conflicting_response = client.post(
+        "/api/v1/bookings",
+        headers=request_headers,
+        json={
+            "user_id": synthetic_user.id,
+            "show_id": show.id,
+            "seat_id": second_seat.id,
+            "experiment_run_id": None,
+        },
+    )
+
+    assert first_response.status_code == 201
+    assert conflicting_response.status_code == 409
+    assert (
+        conflicting_response.json()["detail"]["code"]
+        == "IDEMPOTENCY_KEY_REUSED"
+    )
+
+    db_session.expire_all()
+
+    bookings = db_session.scalars(
+        select(Booking).where(
+            Booking.idempotency_key == idempotency_key
+        )
+    ).all()
+    attempts = db_session.scalars(
+        select(BookingAttempt).where(
+            BookingAttempt.idempotency_key
+            == idempotency_key
+        )
+    ).all()
+    unchanged_second_seat = db_session.get(
+        Seat,
+        second_seat.id,
+    )
+
+    assert len(bookings) == 1
+    assert bookings[0].seat_id == first_seat.id
+    assert len(attempts) == 2
+
+    error_codes = {
+        attempt.error_code
+        for attempt in attempts
+    }
+
+    assert error_codes == {
+        None,
+        "IDEMPOTENCY_KEY_REUSED",
+    }
+
+    assert unchanged_second_seat is not None
+    assert (
+        unchanged_second_seat.state
+        == SeatState.AVAILABLE
+    )
+
+
+def test_second_booking_for_same_seat_is_rejected(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """A confirmed seat cannot receive a second normal booking."""
+
+    first_user, show, seat = get_normal_booking_data(
+        db_session
+    )
+    original_seat_version = seat.version
+
+    second_user = db_session.scalar(
+        select(SyntheticUser)
+        .where(SyntheticUser.id != first_user.id)
+        .order_by(SyntheticUser.id)
+        .limit(1)
+    )
+
+    assert second_user is not None
+
+    first_key = uuid4()
+    second_key = uuid4()
+
+    first_response = client.post(
+        "/api/v1/bookings",
+        headers=booking_headers(str(first_key)),
+        json={
+            "user_id": first_user.id,
+            "show_id": show.id,
+            "seat_id": seat.id,
+            "experiment_run_id": None,
+        },
+    )
+    second_response = client.post(
+        "/api/v1/bookings",
+        headers=booking_headers(str(second_key)),
+        json={
+            "user_id": second_user.id,
+            "show_id": show.id,
+            "seat_id": seat.id,
+            "experiment_run_id": None,
+        },
+    )
+
+    assert first_response.status_code == 201
+    assert second_response.status_code == 409
+    assert (
+        second_response.json()["detail"]["code"]
+        == "SEAT_UNAVAILABLE"
+    )
+
+    db_session.expire_all()
+
+    bookings = db_session.scalars(
+        select(Booking).where(
+            Booking.seat_id == seat.id,
+            Booking.status == BookingStatus.CONFIRMED,
+        )
+    ).all()
+    rejected_attempt = db_session.scalar(
+        select(BookingAttempt).where(
+            BookingAttempt.idempotency_key
+            == second_key
+        )
+    )
+    updated_seat = db_session.get(Seat, seat.id)
+
+    assert len(bookings) == 1
+    assert bookings[0].user_id == first_user.id
+
+    assert rejected_attempt is not None
+    assert (
+        rejected_attempt.outcome
+        == AttemptOutcome.SEAT_UNAVAILABLE
+    )
+    assert rejected_attempt.http_status == 409
+    assert (
+        rejected_attempt.error_code
+        == "SEAT_UNAVAILABLE"
+    )
+
+    assert updated_seat is not None
+    assert updated_seat.state == SeatState.BOOKED
+    assert updated_seat.version == original_seat_version + 1
+
+
+def test_missing_token_does_not_reach_booking_service(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """Authentication failure must not create booking telemetry."""
+
+    synthetic_user, show, seat = get_normal_booking_data(
+        db_session
+    )
+    idempotency_key = uuid4()
+
+    response = client.post(
+        "/api/v1/bookings",
+        headers={
+            "Idempotency-Key": str(idempotency_key),
+        },
+        json={
+            "user_id": synthetic_user.id,
+            "show_id": show.id,
+            "seat_id": seat.id,
+            "experiment_run_id": None,
+        },
+    )
+
+    assert response.status_code == 401
+    assert (
+        response.json()["detail"]["code"]
+        == "INVALID_INTERNAL_TOKEN"
+    )
+
+    db_session.expire_all()
+
+    booking = db_session.scalar(
+        select(Booking).where(
+            Booking.idempotency_key == idempotency_key
+        )
+    )
+    attempt = db_session.scalar(
+        select(BookingAttempt).where(
+            BookingAttempt.idempotency_key
+            == idempotency_key
+        )
+    )
+    unchanged_seat = db_session.get(Seat, seat.id)
+
+    assert booking is None
+    assert attempt is None
+
+    assert unchanged_seat is not None
+    assert unchanged_seat.state == SeatState.AVAILABLE
+
+
+def test_invalid_request_body_does_not_reach_booking_service(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """Schema validation failure must happen before database work."""
+
+    _, show, seat = get_normal_booking_data(
+        db_session
+    )
+    idempotency_key = uuid4()
+
+    response = client.post(
+        "/api/v1/bookings",
+        headers=booking_headers(
+            str(idempotency_key)
+        ),
+        json={
+            "user_id": 0,
+            "show_id": show.id,
+            "seat_id": seat.id,
+            "experiment_run_id": None,
+            "unexpected_field": "not allowed",
+        },
+    )
+
+    assert response.status_code == 422
+
+    db_session.expire_all()
+
+    booking = db_session.scalar(
+        select(Booking).where(
+            Booking.idempotency_key == idempotency_key
+        )
+    )
+    attempt = db_session.scalar(
+        select(BookingAttempt).where(
+            BookingAttempt.idempotency_key
+            == idempotency_key
+        )
+    )
+    unchanged_seat = db_session.get(Seat, seat.id)
+
+    assert booking is None
+    assert attempt is None
+
+    assert unchanged_seat is not None
+    assert unchanged_seat.state == SeatState.AVAILABLE
