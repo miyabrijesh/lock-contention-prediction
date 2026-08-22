@@ -16,7 +16,6 @@ app = FastAPI(
 app.include_router(health_router)
 app.include_router(shows_router)
 
-
 @app.get(
     "/",
     include_in_schema=False,
