@@ -1,5 +1,8 @@
+import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from decimal import Decimal
+from time import perf_counter
 from uuid import UUID
 
 from sqlalchemy.exc import (
@@ -12,17 +15,22 @@ from sqlalchemy.orm import Session
 from backend.app.core.config import settings
 from backend.app.models import Booking
 from backend.app.models.enums import (
+    AttemptOutcome,
     BookingStatus,
     ExperimentStatus,
     SeatState,
 )
 from backend.app.repositories.booking_repository import (
+    add_booking_attempt,
     get_booking_by_idempotency_key,
     get_experiment_run,
     get_seat_for_update,
     get_show,
     get_synthetic_user,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -79,16 +87,131 @@ def _request_matches_booking(
 def _get_sqlstate(
     error: OperationalError,
 ) -> str | None:
-    """Read PostgreSQL's SQLSTATE value from an operational error."""
+    """Read PostgreSQL's SQLSTATE from an operational error."""
 
     return getattr(error.orig, "sqlstate", None)
+
+
+def _calculate_attempt_timing(
+    requested_at: datetime,
+    started_at: float,
+) -> tuple[datetime, Decimal]:
+    """Calculate completion time and nonnegative latency."""
+
+    completed_at = datetime.now(UTC)
+    elapsed_ms = max(
+        0.0,
+        (perf_counter() - started_at) * 1000,
+    )
+    latency_ms = Decimal(f"{elapsed_ms:.3f}")
+
+    if completed_at < requested_at:
+        completed_at = requested_at
+
+    return completed_at, latency_ms
+
+
+def _outcome_for_error(
+    error: BookingServiceError,
+) -> AttemptOutcome:
+    """Map a service error to a telemetry outcome."""
+
+    if error.code == "SEAT_UNAVAILABLE":
+        return AttemptOutcome.SEAT_UNAVAILABLE
+
+    if error.code in {
+        "LOCK_TIMEOUT",
+        "DATABASE_TIMEOUT",
+    }:
+        return AttemptOutcome.LOCK_TIMEOUT
+
+    if error.status_code < 500:
+        return AttemptOutcome.VALIDATION_ERROR
+
+    return AttemptOutcome.INTERNAL_ERROR
+
+
+def _add_attempt_to_session(
+    session: Session,
+    *,
+    command: BookingCommand,
+    requested_at: datetime,
+    started_at: float,
+    persisted_experiment_run_id: UUID | None,
+    outcome: AttemptOutcome,
+    http_status: int,
+    error_code: str | None,
+) -> None:
+    """Create an attempt record without committing it."""
+
+    completed_at, latency_ms = _calculate_attempt_timing(
+        requested_at,
+        started_at,
+    )
+
+    add_booking_attempt(
+        session,
+        idempotency_key=command.idempotency_key,
+        experiment_run_id=persisted_experiment_run_id,
+        user_id=command.user_id,
+        show_id=command.show_id,
+        seat_id=command.seat_id,
+        requested_at=requested_at,
+        completed_at=completed_at,
+        latency_ms=latency_ms,
+        outcome=outcome,
+        http_status=http_status,
+        error_code=error_code,
+    )
+
+
+def _record_failed_attempt(
+    session: Session,
+    *,
+    command: BookingCommand,
+    requested_at: datetime,
+    started_at: float,
+    persisted_experiment_run_id: UUID | None,
+    error: BookingServiceError,
+) -> None:
+    """Roll back booking work and persist failure telemetry."""
+
+    session.rollback()
+
+    try:
+        _add_attempt_to_session(
+            session,
+            command=command,
+            requested_at=requested_at,
+            started_at=started_at,
+            persisted_experiment_run_id=(
+                persisted_experiment_run_id
+            ),
+            outcome=_outcome_for_error(error),
+            http_status=error.status_code,
+            error_code=error.code,
+        )
+        session.commit()
+    except SQLAlchemyError:
+        session.rollback()
+        logger.exception(
+            "Unable to persist booking-attempt telemetry."
+        )
 
 
 def create_booking(
     session: Session,
     command: BookingCommand,
 ) -> BookingResult:
-    """Create one confirmed booking in a database transaction."""
+    """Create one booking and record its attempt telemetry."""
+
+    requested_at = datetime.now(UTC)
+    started_at = perf_counter()
+
+    # This stays null until the requested experiment is confirmed to exist.
+    # It prevents telemetry for an invalid experiment UUID from violating
+    # the booking_attempts foreign-key constraint.
+    persisted_experiment_run_id: UUID | None = None
 
     try:
         existing_booking = get_booking_by_idempotency_key(
@@ -109,6 +232,21 @@ def create_booking(
                     ),
                     status_code=409,
                 )
+
+            _add_attempt_to_session(
+                session,
+                command=command,
+                requested_at=requested_at,
+                started_at=started_at,
+                persisted_experiment_run_id=(
+                    existing_booking.experiment_run_id
+                ),
+                outcome=AttemptOutcome.SUCCESS,
+                http_status=200,
+                error_code=None,
+            )
+            session.commit()
+            session.refresh(existing_booking)
 
             return BookingResult(
                 booking=existing_booking,
@@ -168,6 +306,8 @@ def create_booking(
                     message="The requested experiment was not found.",
                     status_code=404,
                 )
+
+            persisted_experiment_run_id = experiment_run.id
 
             if experiment_run.status != ExperimentStatus.RUNNING:
                 raise BookingServiceError(
@@ -242,6 +382,20 @@ def create_booking(
         )
 
         session.add(booking)
+
+        _add_attempt_to_session(
+            session,
+            command=command,
+            requested_at=requested_at,
+            started_at=started_at,
+            persisted_experiment_run_id=(
+                persisted_experiment_run_id
+            ),
+            outcome=AttemptOutcome.SUCCESS,
+            http_status=201,
+            error_code=None,
+        )
+
         session.commit()
         session.refresh(booking)
 
@@ -250,58 +404,101 @@ def create_booking(
             replayed=False,
         )
 
-    except BookingServiceError:
-        session.rollback()
+    except BookingServiceError as error:
+        _record_failed_attempt(
+            session,
+            command=command,
+            requested_at=requested_at,
+            started_at=started_at,
+            persisted_experiment_run_id=(
+                persisted_experiment_run_id
+            ),
+            error=error,
+        )
         raise
 
-    except IntegrityError as error:
-        session.rollback()
-
-        raise BookingServiceError(
+    except IntegrityError as database_error:
+        service_error = BookingServiceError(
             code="SEAT_UNAVAILABLE",
             message=(
                 "The booking conflicted with another "
                 "completed booking."
             ),
             status_code=409,
-        ) from error
+        )
 
-    except OperationalError as error:
-        session.rollback()
+        _record_failed_attempt(
+            session,
+            command=command,
+            requested_at=requested_at,
+            started_at=started_at,
+            persisted_experiment_run_id=(
+                persisted_experiment_run_id
+            ),
+            error=service_error,
+        )
 
-        sqlstate = _get_sqlstate(error)
+        raise service_error from database_error
+
+    except OperationalError as database_error:
+        sqlstate = _get_sqlstate(database_error)
 
         if sqlstate == "55P03":
-            raise BookingServiceError(
+            service_error = BookingServiceError(
                 code="LOCK_TIMEOUT",
                 message=(
                     "The seat lock could not be acquired "
                     "within the configured timeout."
                 ),
                 status_code=503,
-            ) from error
-
-        if sqlstate == "57014":
-            raise BookingServiceError(
+            )
+        elif sqlstate == "57014":
+            service_error = BookingServiceError(
                 code="DATABASE_TIMEOUT",
                 message=(
                     "The database statement exceeded "
                     "the configured timeout."
                 ),
                 status_code=503,
-            ) from error
+            )
+        else:
+            service_error = BookingServiceError(
+                code="INTERNAL_ERROR",
+                message=(
+                    "An unexpected database error occurred."
+                ),
+                status_code=500,
+            )
 
-        raise BookingServiceError(
+        _record_failed_attempt(
+            session,
+            command=command,
+            requested_at=requested_at,
+            started_at=started_at,
+            persisted_experiment_run_id=(
+                persisted_experiment_run_id
+            ),
+            error=service_error,
+        )
+
+        raise service_error from database_error
+
+    except SQLAlchemyError as database_error:
+        service_error = BookingServiceError(
             code="INTERNAL_ERROR",
             message="An unexpected database error occurred.",
             status_code=500,
-        ) from error
+        )
 
-    except SQLAlchemyError as error:
-        session.rollback()
+        _record_failed_attempt(
+            session,
+            command=command,
+            requested_at=requested_at,
+            started_at=started_at,
+            persisted_experiment_run_id=(
+                persisted_experiment_run_id
+            ),
+            error=service_error,
+        )
 
-        raise BookingServiceError(
-            code="INTERNAL_ERROR",
-            message="An unexpected database error occurred.",
-            status_code=500,
-        ) from error
+        raise service_error from database_error

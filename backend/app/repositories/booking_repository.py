@@ -1,3 +1,5 @@
+from datetime import datetime
+from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import select
@@ -5,11 +7,13 @@ from sqlalchemy.orm import Session
 
 from backend.app.models import (
     Booking,
+    BookingAttempt,
     ExperimentRun,
     Seat,
     Show,
     SyntheticUser,
 )
+from backend.app.models.enums import AttemptOutcome
 
 
 def get_booking_by_idempotency_key(
@@ -68,3 +72,39 @@ def get_seat_for_update(
     )
 
     return session.scalar(statement)
+
+
+def add_booking_attempt(
+    session: Session,
+    *,
+    idempotency_key: UUID,
+    experiment_run_id: UUID | None,
+    user_id: int,
+    show_id: int,
+    seat_id: int,
+    requested_at: datetime,
+    completed_at: datetime,
+    latency_ms: Decimal,
+    outcome: AttemptOutcome,
+    http_status: int,
+    error_code: str | None,
+) -> BookingAttempt:
+    """Add one booking-attempt telemetry record to the session."""
+
+    attempt = BookingAttempt(
+        idempotency_key=idempotency_key,
+        experiment_run_id=experiment_run_id,
+        user_id=user_id,
+        show_id=show_id,
+        seat_id=seat_id,
+        requested_at=requested_at,
+        completed_at=completed_at,
+        latency_ms=latency_ms,
+        outcome=outcome,
+        http_status=http_status,
+        error_code=error_code,
+    )
+
+    session.add(attempt)
+
+    return attempt

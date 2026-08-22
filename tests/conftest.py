@@ -45,10 +45,8 @@ def dispose_test_engine() -> Generator[None, None, None]:
 
 
 @pytest.fixture
-def client(
-    monkeypatch: pytest.MonkeyPatch,
-) -> Generator[TestClient, None, None]:
-    """Run each API test inside a rollback-only transaction."""
+def db_session() -> Generator[Session, None, None]:
+    """Provide a session inside a rollback-only test transaction."""
 
     connection = test_engine.connect()
     transaction = connection.begin()
@@ -58,8 +56,26 @@ def client(
         join_transaction_mode="create_savepoint",
     )
 
-    def override_get_db() -> Generator[Session, None, None]:
+    try:
         yield test_session
+    finally:
+        test_session.close()
+
+        if transaction.is_active:
+            transaction.rollback()
+
+        connection.close()
+
+
+@pytest.fixture
+def client(
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> Generator[TestClient, None, None]:
+    """Run API requests using the rollback-only test session."""
+
+    def override_get_db() -> Generator[Session, None, None]:
+        yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
 
@@ -74,6 +90,3 @@ def client(
             yield test_client
     finally:
         app.dependency_overrides.clear()
-        test_session.close()
-        transaction.rollback()
-        connection.close()
