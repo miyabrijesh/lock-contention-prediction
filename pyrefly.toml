@@ -1,0 +1,2 @@
+python-interpreter-path = ".venv/bin/python3"
+search-path = ["."]
