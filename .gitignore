@@ -29,3 +29,5 @@ data/processed/*
 # Trained machine-learning models
 ml/models/*
 !ml/models/.gitkeep
+
+data/exports/
