@@ -53,7 +53,7 @@ IdempotencyKey = Annotated[
     "",
     response_model=BookingRead,
     status_code=status.HTTP_201_CREATED,
-    summary="Create a confirmed seat booking",
+    summary="Create a transactional seat booking",
     responses={
         status.HTTP_400_BAD_REQUEST: {
             "model": BookingErrorResponse,

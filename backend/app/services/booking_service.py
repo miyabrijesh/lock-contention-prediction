@@ -2,7 +2,7 @@ import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
-from time import perf_counter
+from time import perf_counter, sleep
 from uuid import UUID
 
 from sqlalchemy.exc import (
@@ -213,6 +213,10 @@ def create_booking(
     # the booking_attempts foreign-key constraint.
     persisted_experiment_run_id: UUID | None = None
 
+    # These values are populated only after a valid experiment is found.
+    recycle_experiment = False
+    simulated_work_ms = 0
+
     try:
         existing_booking = get_booking_by_idempotency_key(
             session,
@@ -329,6 +333,14 @@ def create_booking(
                     status_code=409,
                 )
 
+            recycle_experiment = (
+                experiment_run.booking_mode
+                == "EXPERIMENT_RECYCLE"
+            )
+            simulated_work_ms = (
+                experiment_run.simulated_work_ms
+            )
+
         seat = get_seat_for_update(
             session,
             command.seat_id,
@@ -368,18 +380,47 @@ def create_booking(
                 status_code=409,
             )
 
-        seat.state = SeatState.BOOKED
-        seat.hold_expires_at = None
-        seat.version += 1
+        if recycle_experiment:
+            # The SELECT FOR UPDATE lock has already been acquired.
+            # Sleeping here deliberately keeps that PostgreSQL row
+            # locked so concurrent requests must wait.
+            if simulated_work_ms > 0:
+                sleep(simulated_work_ms / 1000)
 
-        booking = Booking(
-            idempotency_key=command.idempotency_key,
-            user_id=command.user_id,
-            show_id=command.show_id,
-            seat_id=command.seat_id,
-            experiment_run_id=command.experiment_run_id,
-            status=BookingStatus.CONFIRMED,
-        )
+            recycled_at = datetime.now(UTC)
+
+            # The experimental seat is immediately reusable after
+            # this transaction commits.
+            seat.state = SeatState.AVAILABLE
+            seat.hold_expires_at = None
+            seat.version += 1
+
+            # A cancelled booking preserves idempotency and traceability
+            # without permanently consuming the experiment seat.
+            booking = Booking(
+                idempotency_key=command.idempotency_key,
+                user_id=command.user_id,
+                show_id=command.show_id,
+                seat_id=command.seat_id,
+                experiment_run_id=command.experiment_run_id,
+                status=BookingStatus.CANCELLED,
+                cancelled_at=recycled_at,
+            )
+        else:
+            # Normal bookings and NORMAL-mode experiments permanently
+            # consume the selected seat.
+            seat.state = SeatState.BOOKED
+            seat.hold_expires_at = None
+            seat.version += 1
+
+            booking = Booking(
+                idempotency_key=command.idempotency_key,
+                user_id=command.user_id,
+                show_id=command.show_id,
+                seat_id=command.seat_id,
+                experiment_run_id=command.experiment_run_id,
+                status=BookingStatus.CONFIRMED,
+            )
 
         session.add(booking)
 

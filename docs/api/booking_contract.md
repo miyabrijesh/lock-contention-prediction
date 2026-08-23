@@ -96,7 +96,15 @@ When `experiment_run_id` is supplied:
 - The experiment status must be `RUNNING`.
 - The experiment must belong to the requested show.
 - The show must be marked as an experiment show.
-- Experiment recycling behaviour will be added during the workload phase.
+- `NORMAL` mode follows the standard confirmed-booking transaction.
+- `EXPERIMENT_RECYCLE` mode holds the seat row lock for the configured
+  `simulated_work_ms`.
+- A recycled request returns the seat to `AVAILABLE` before committing.
+- A recycled request increments the seat version.
+- A recycled request stores a `CANCELLED` booking with `cancelled_at` set.
+- The cancelled booking preserves idempotency and experiment traceability.
+- A successful recycled request records a successful booking attempt.
+- Recycling is never permitted for normal customer bookings.
 
 ### Seat-state rules
 
@@ -104,6 +112,28 @@ When `experiment_run_id` is supplied:
 - `BOOKED`: return `409 SEAT_UNAVAILABLE`.
 - `HELD` with a future expiry: return `409 SEAT_UNAVAILABLE`.
 - `HELD` with an expired expiry: release it while holding the row lock and continue.
+
+### Experiment-recycle transaction requirements
+
+[RECOMMENDED DEFAULT]
+
+For an `EXPERIMENT_RECYCLE` request, the following operations occur in one
+database transaction:
+
+1. Validate the user, show and running experiment.
+2. Lock the selected seat using `SELECT FOR UPDATE`.
+3. Revalidate that the seat is available.
+4. Hold the row lock for `simulated_work_ms`.
+5. Increment the seat version.
+6. Keep the seat state as `AVAILABLE`.
+7. Clear `hold_expires_at`.
+8. Insert a `CANCELLED` booking with `cancelled_at` set.
+9. Insert one successful booking-attempt telemetry record.
+10. Commit once.
+
+The cancelled booking is an experimental trace record. It is not a real
+customer cancellation. Its purpose is to preserve idempotency and link the
+request to its experiment while allowing the same seat to be reused.
 
 ### Transaction requirements
 
