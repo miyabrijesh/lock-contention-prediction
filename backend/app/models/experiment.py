@@ -13,6 +13,7 @@ from sqlalchemy import (
     Numeric,
     String,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PostgresUUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -67,6 +68,14 @@ class ExperimentRun(Base):
             "ix_experiment_runs_show_started",
             "show_id",
             "started_at",
+        ),
+        Index(
+            "uq_experiment_runs_single_running",
+            "status",
+            unique=True,
+            postgresql_where=text(
+                "status = 'RUNNING'"
+            ),
         ),
     )
 

@@ -14,6 +14,14 @@ InternalTokenHeader = Annotated[
     ),
 ]
 
+AdminTokenHeader = Annotated[
+    str | None,
+    Header(
+        alias="X-Admin-Token",
+        description="Administrator token for experiment management.",
+    ),
+]
+
 
 def require_internal_token(
     x_internal_token: InternalTokenHeader = None,
@@ -37,5 +45,31 @@ def require_internal_token(
             },
             headers={
                 "WWW-Authenticate": "InternalToken",
+            },
+        )
+
+
+def require_admin_token(
+    x_admin_token: AdminTokenHeader = None,
+) -> None:
+    """Reject experiment management without the admin token."""
+
+    if (
+        x_admin_token is None
+        or not compare_digest(
+            x_admin_token,
+            settings.admin_api_token,
+        )
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "code": "INVALID_ADMIN_TOKEN",
+                "message": (
+                    "A valid administrator API token is required."
+                ),
+            },
+            headers={
+                "WWW-Authenticate": "AdminToken",
             },
         )
