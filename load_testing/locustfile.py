@@ -3,11 +3,21 @@ from itertools import count
 from random import Random
 from uuid import uuid4
 
-from locust import HttpUser, between, events, task
+from locust import (
+    HttpUser,
+    LoadTestShape,
+    between,
+    events,
+    task,
+)
 
 from load_testing.config import (
     WorkloadConfig,
     WorkloadConfigurationError,
+)
+from load_testing.traffic_patterns import (
+    build_traffic_pattern_plan,
+    target_users_at,
 )
 
 
@@ -87,6 +97,46 @@ def clear_workload(
 
     _workload_config = None
     _internal_api_token = None
+
+
+class ExperimentTrafficShape(LoadTestShape):
+    """Control Locust users using the experiment traffic pattern."""
+
+    def __init__(self) -> None:
+        super().__init__()
+
+        self.configuration = (
+            WorkloadConfig.from_environment()
+        )
+        self.traffic_plan = (
+            build_traffic_pattern_plan(
+                self.configuration.traffic_pattern,
+                duration_sec=(
+                    self.configuration.duration_sec
+                ),
+            )
+        )
+
+    def tick(self) -> tuple[int, float] | None:
+        """Return the desired user count and spawn rate."""
+
+        elapsed_seconds = self.get_run_time()
+
+        if elapsed_seconds >= self.configuration.duration_sec:
+            return None
+
+        target_user_count = target_users_at(
+            self.traffic_plan,
+            elapsed_seconds=elapsed_seconds,
+            maximum_users=(
+                self.configuration.maximum_users
+            ),
+        )
+
+        return (
+            target_user_count,
+            self.configuration.spawn_rate_per_sec,
+        )
 
 
 class ReservationWorkloadUser(HttpUser):

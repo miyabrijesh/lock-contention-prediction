@@ -18,6 +18,20 @@ BookingMode = Literal[
     "EXPERIMENT_RECYCLE",
 ]
 
+TrafficPatternName = Literal[
+    "STEADY",
+    "RAMP",
+    "BURST",
+    "FLASH_SALE",
+    "COOLDOWN",
+]
+
+DemandProfileCode = Literal[
+    "CUSTOM",
+    "LOW",
+    "MEDIUM",
+    "HIGH",
+]
 
 class ExperimentCreate(BaseModel):
     """Validated configuration for a new experiment."""
@@ -42,6 +56,8 @@ class ExperimentCreate(BaseModel):
         ge=30,
         le=3600,
     )
+    traffic_pattern: TrafficPatternName = "STEADY"
+    demand_profile: DemandProfileCode = "CUSTOM"
     hotspot_ratio: Decimal = Field(
         ge=Decimal("0"),
         le=Decimal("1"),
@@ -187,6 +203,8 @@ class ExperimentRead(BaseModel):
     user_count: int
     spawn_rate_per_sec: Decimal
     duration_sec: int
+    traffic_pattern: TrafficPatternName
+    demand_profile: DemandProfileCode
     hotspot_ratio: Decimal
     hotspot_seat_ids: list[int]
     sample_interval_sec: int

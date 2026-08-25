@@ -7,6 +7,7 @@ from load_testing.config import (
     WorkloadConfig,
     WorkloadConfigurationError,
 )
+from load_testing.traffic_patterns import TrafficPattern
 
 
 EXPERIMENT_RUN_ID = UUID(
@@ -47,6 +48,22 @@ def test_load_workload_configuration_from_environment(
         "LOAD_RANDOM_SEED",
         "42",
     )
+    monkeypatch.setenv(
+        "LOAD_MAXIMUM_USERS",
+        "3",
+    )
+    monkeypatch.setenv(
+        "LOAD_SPAWN_RATE_PER_SEC",
+        "2.5",
+    )
+    monkeypatch.setenv(
+        "LOAD_DURATION_SEC",
+        "90",
+    )
+    monkeypatch.setenv(
+        "LOAD_TRAFFIC_PATTERN",
+        "BURST",
+    )
 
     configuration = (
         WorkloadConfig.from_environment()
@@ -73,6 +90,13 @@ def test_load_workload_configuration_from_environment(
     )
     assert configuration.hotspot_ratio == 0.8
     assert configuration.random_seed == 42
+    assert configuration.maximum_users == 3
+    assert configuration.spawn_rate_per_sec == 2.5
+    assert configuration.duration_sec == 90
+    assert (
+        configuration.traffic_pattern
+        == TrafficPattern.BURST
+    )
 
 
 def test_ratio_one_selects_only_hotspot_seats() -> None:

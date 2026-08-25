@@ -22,6 +22,10 @@ from backend.app.schemas.experiment import (
     ExperimentCreate,
     ExperimentTransition,
 )
+from load_testing.demand_profiles import (
+    DemandProfileError,
+    validate_demand_configuration,
+)
 
 
 class ExperimentServiceError(Exception):
@@ -164,6 +168,21 @@ def create_experiment(
             hotspot_seat_ids=command.hotspot_seat_ids,
         )
 
+        try:
+            validate_demand_configuration(
+                profile_name=command.demand_profile,
+                hotspot_ratio=command.hotspot_ratio,
+                hotspot_seat_count=len(
+                    command.hotspot_seat_ids
+                ),
+            )
+        except DemandProfileError as error:
+            raise ExperimentServiceError(
+                code="DEMAND_PROFILE_MISMATCH",
+                message=str(error),
+                status_code=422,
+            ) from error
+
         experiment = ExperimentRun(
             name=command.name,
             show_id=command.show_id,
@@ -185,6 +204,8 @@ def create_experiment(
             ),
             booking_mode=command.booking_mode,
             random_seed=command.random_seed,
+            traffic_pattern=command.traffic_pattern,
+            demand_profile=command.demand_profile,
             code_version=command.code_version,
             created_by=command.created_by,
         )
@@ -206,6 +227,8 @@ def create_experiment(
                 "status": ExperimentStatus.DRAFT.value,
                 "show_id": command.show_id,
                 "booking_mode": command.booking_mode,
+                "traffic_pattern": command.traffic_pattern,
+                "demand_profile": command.demand_profile,
             },
         )
 
@@ -278,9 +301,16 @@ def read_experiment(
 def start_experiment(
     session: Session,
     experiment_run_id: UUID,
-    transition: ExperimentTransition,
+    command: ExperimentTransition,
 ) -> ExperimentRun:
-    """Move a DRAFT experiment into RUNNING status."""
+    """Transition a draft experiment to running."""
+
+    if not settings.experiment_mode_enabled:
+        raise ExperimentServiceError(
+            code="EXPERIMENT_MODE_DISABLED",
+            message="Experiment execution is disabled.",
+            status_code=403,
+        )
 
     try:
         experiment = get_experiment_run_for_update(
@@ -295,12 +325,6 @@ def start_experiment(
                 status_code=404,
             )
 
-        # Repeating the same successful transition is safe.
-        if experiment.status == ExperimentStatus.RUNNING:
-            session.commit()
-            session.refresh(experiment)
-            return experiment
-
         if experiment.status != ExperimentStatus.DRAFT:
             raise ExperimentServiceError(
                 code="INVALID_EXPERIMENT_TRANSITION",
@@ -310,24 +334,15 @@ def start_experiment(
                 status_code=409,
             )
 
-        if not settings.experiment_mode_enabled:
-            raise ExperimentServiceError(
-                code="EXPERIMENT_MODE_DISABLED",
-                message="Experiment mode is disabled.",
-                status_code=403,
-            )
-
         running_experiment = get_running_experiment(
             session,
-            exclude_experiment_id=experiment.id,
         )
 
         if running_experiment is not None:
             raise ExperimentServiceError(
                 code="EXPERIMENT_ALREADY_RUNNING",
                 message=(
-                    "Another experiment is already running. "
-                    "Complete, fail, or cancel it first."
+                    "Another experiment is already running."
                 ),
                 status_code=409,
             )
@@ -343,7 +358,7 @@ def start_experiment(
         unavailable_seat_count = (
             count_non_available_seats(
                 session,
-                experiment.show_id,
+                show_id=experiment.show_id,
             )
         )
 
@@ -351,30 +366,29 @@ def start_experiment(
             raise ExperimentServiceError(
                 code="EXPERIMENT_SEATS_NOT_READY",
                 message=(
-                    "All seats in the experiment show must "
-                    "be available before the experiment starts."
+                    "All experiment-show seats must be available "
+                    "before an experiment can start."
                 ),
                 status_code=409,
             )
 
+        started_at = datetime.now(UTC)
+
         experiment.status = ExperimentStatus.RUNNING
-        experiment.started_at = datetime.now(UTC)
+        experiment.started_at = started_at
         experiment.ended_at = None
-
-        audit_details: dict[str, object] = {
-            "from_status": ExperimentStatus.DRAFT.value,
-            "to_status": ExperimentStatus.RUNNING.value,
-        }
-
-        if transition.reason is not None:
-            audit_details["reason"] = transition.reason
 
         add_audit_event(
             session,
             experiment_run_id=experiment.id,
             action="experiment_started",
-            actor=transition.actor,
-            details=audit_details,
+            actor=command.actor,
+            details={
+                "from_status": ExperimentStatus.DRAFT.value,
+                "to_status": ExperimentStatus.RUNNING.value,
+                "reason": command.reason,
+                "started_at": started_at.isoformat(),
+            },
         )
 
         session.commit()
@@ -397,14 +411,13 @@ def start_experiment(
 
 def _finish_experiment(
     session: Session,
-    *,
     experiment_run_id: UUID,
-    transition: ExperimentTransition,
+    command: ExperimentTransition,
+    *,
     target_status: ExperimentStatus,
-    action: str,
-    allowed_statuses: set[ExperimentStatus],
+    audit_action: str,
 ) -> ExperimentRun:
-    """Apply one terminal experiment status transition."""
+    """Transition a running experiment to a terminal status."""
 
     try:
         experiment = get_experiment_run_for_update(
@@ -419,46 +432,32 @@ def _finish_experiment(
                 status_code=404,
             )
 
-        # Repeating the same completed transition is safe.
-        if experiment.status == target_status:
-            session.commit()
-            session.refresh(experiment)
-            return experiment
-
-        if experiment.status not in allowed_statuses:
+        if experiment.status != ExperimentStatus.RUNNING:
             raise ExperimentServiceError(
                 code="INVALID_EXPERIMENT_TRANSITION",
                 message=(
-                    f"An experiment in {experiment.status.value} "
-                    f"status cannot transition to "
-                    f"{target_status.value}."
+                    "Only a RUNNING experiment can transition "
+                    f"to {target_status.value}."
                 ),
                 status_code=409,
             )
 
-        previous_status = experiment.status
+        ended_at = datetime.now(UTC)
 
         experiment.status = target_status
-
-        # A DRAFT experiment cancelled before starting has
-        # no runtime end timestamp.
-        if previous_status == ExperimentStatus.RUNNING:
-            experiment.ended_at = datetime.now(UTC)
-
-        audit_details: dict[str, object] = {
-            "from_status": previous_status.value,
-            "to_status": target_status.value,
-        }
-
-        if transition.reason is not None:
-            audit_details["reason"] = transition.reason
+        experiment.ended_at = ended_at
 
         add_audit_event(
             session,
             experiment_run_id=experiment.id,
-            action=action,
-            actor=transition.actor,
-            details=audit_details,
+            action=audit_action,
+            actor=command.actor,
+            details={
+                "from_status": ExperimentStatus.RUNNING.value,
+                "to_status": target_status.value,
+                "reason": command.reason,
+                "ended_at": ended_at.isoformat(),
+            },
         )
 
         session.commit()
@@ -482,56 +481,100 @@ def _finish_experiment(
 def complete_experiment(
     session: Session,
     experiment_run_id: UUID,
-    transition: ExperimentTransition,
+    command: ExperimentTransition,
 ) -> ExperimentRun:
-    """Complete a running experiment."""
+    """Transition a running experiment to completed."""
 
     return _finish_experiment(
         session,
-        experiment_run_id=experiment_run_id,
-        transition=transition,
+        experiment_run_id,
+        command,
         target_status=ExperimentStatus.COMPLETED,
-        action="experiment_completed",
-        allowed_statuses={
-            ExperimentStatus.RUNNING,
-        },
+        audit_action="experiment_completed",
     )
 
 
 def fail_experiment(
     session: Session,
     experiment_run_id: UUID,
-    transition: ExperimentTransition,
+    command: ExperimentTransition,
 ) -> ExperimentRun:
-    """Mark a running experiment as failed."""
+    """Transition a running experiment to failed."""
 
     return _finish_experiment(
         session,
-        experiment_run_id=experiment_run_id,
-        transition=transition,
+        experiment_run_id,
+        command,
         target_status=ExperimentStatus.FAILED,
-        action="experiment_failed",
-        allowed_statuses={
-            ExperimentStatus.RUNNING,
-        },
+        audit_action="experiment_failed",
     )
 
 
 def cancel_experiment(
     session: Session,
     experiment_run_id: UUID,
-    transition: ExperimentTransition,
+    command: ExperimentTransition,
 ) -> ExperimentRun:
     """Cancel a draft or running experiment."""
 
-    return _finish_experiment(
-        session,
-        experiment_run_id=experiment_run_id,
-        transition=transition,
-        target_status=ExperimentStatus.CANCELLED,
-        action="experiment_cancelled",
-        allowed_statuses={
+    try:
+        experiment = get_experiment_run_for_update(
+            session,
+            experiment_run_id,
+        )
+
+        if experiment is None:
+            raise ExperimentServiceError(
+                code="EXPERIMENT_NOT_FOUND",
+                message="The requested experiment was not found.",
+                status_code=404,
+            )
+
+        if experiment.status not in {
             ExperimentStatus.DRAFT,
             ExperimentStatus.RUNNING,
-        },
-    )
+        }:
+            raise ExperimentServiceError(
+                code="INVALID_EXPERIMENT_TRANSITION",
+                message=(
+                    "Only a DRAFT or RUNNING experiment "
+                    "can be cancelled."
+                ),
+                status_code=409,
+            )
+
+        previous_status = experiment.status
+        ended_at = datetime.now(UTC)
+
+        experiment.status = ExperimentStatus.CANCELLED
+        experiment.ended_at = ended_at
+
+        add_audit_event(
+            session,
+            experiment_run_id=experiment.id,
+            action="experiment_cancelled",
+            actor=command.actor,
+            details={
+                "from_status": previous_status.value,
+                "to_status": ExperimentStatus.CANCELLED.value,
+                "reason": command.reason,
+                "ended_at": ended_at.isoformat(),
+            },
+        )
+
+        session.commit()
+        session.refresh(experiment)
+
+        return experiment
+
+    except ExperimentServiceError:
+        session.rollback()
+        raise
+
+    except IntegrityError as error:
+        session.rollback()
+        raise _integrity_error(error) from error
+
+    except SQLAlchemyError as error:
+        session.rollback()
+        raise _database_error() from error

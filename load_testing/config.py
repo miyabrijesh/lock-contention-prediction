@@ -1,8 +1,21 @@
 import json
 import os
 from dataclasses import dataclass
+from decimal import Decimal
 from random import Random
 from uuid import UUID
+
+from load_testing.demand_profiles import (
+    DemandProfileError,
+    DemandProfileName,
+    parse_demand_profile_name,
+    validate_demand_configuration,
+)
+from load_testing.traffic_patterns import (
+    TrafficPattern,
+    TrafficPatternError,
+    parse_traffic_pattern,
+)
 
 
 class WorkloadConfigurationError(ValueError):
@@ -59,6 +72,28 @@ def _read_integer(
         raise WorkloadConfigurationError(
             f"{name} must be an integer."
         ) from error
+
+
+def _read_positive_number(
+    name: str,
+) -> float:
+    """Read one positive floating-point environment value."""
+
+    raw_value = _required_environment_value(name)
+
+    try:
+        value = float(raw_value)
+    except ValueError as error:
+        raise WorkloadConfigurationError(
+            f"{name} must be a number."
+        ) from error
+
+    if value <= 0:
+        raise WorkloadConfigurationError(
+            f"{name} must be greater than zero."
+        )
+
+    return value
 
 
 def _read_ratio(
@@ -130,6 +165,41 @@ def _read_positive_integer_list(
     return tuple(values)
 
 
+def _read_traffic_pattern(
+    name: str,
+) -> TrafficPattern:
+    """Read and validate one traffic-pattern name."""
+
+    raw_value = _required_environment_value(name)
+
+    try:
+        return parse_traffic_pattern(raw_value)
+    except TrafficPatternError as error:
+        raise WorkloadConfigurationError(
+            f"{name} is invalid: {error}"
+        ) from error
+
+
+def _read_demand_profile(
+    name: str,
+) -> DemandProfileName:
+    """Read a demand profile, defaulting legacy runs to CUSTOM."""
+
+    raw_value = os.getenv(name)
+
+    if raw_value is None or not raw_value.strip():
+        return DemandProfileName.CUSTOM
+
+    try:
+        return parse_demand_profile_name(
+            raw_value
+        )
+    except DemandProfileError as error:
+        raise WorkloadConfigurationError(
+            f"{name} is invalid: {error}"
+        ) from error
+
+
 @dataclass(frozen=True)
 class WorkloadConfig:
     """Immutable configuration used by Locust users."""
@@ -141,6 +211,11 @@ class WorkloadConfig:
     hotspot_seat_ids: tuple[int, ...]
     hotspot_ratio: float
     random_seed: int
+    maximum_users: int = 1
+    spawn_rate_per_sec: float = 1.0
+    duration_sec: int = 30
+    traffic_pattern: TrafficPattern = TrafficPattern.STEADY
+    demand_profile: DemandProfileName = DemandProfileName.CUSTOM
 
     def __post_init__(self) -> None:
         """Validate values supplied directly or from the environment."""
@@ -170,6 +245,45 @@ class WorkloadConfig:
                 "hotspot_ratio must be between 0 and 1."
             )
 
+        if self.maximum_users <= 0:
+            raise WorkloadConfigurationError(
+                "maximum_users must be greater than zero."
+            )
+
+        if self.maximum_users > len(self.user_ids):
+            raise WorkloadConfigurationError(
+                "maximum_users cannot exceed the number "
+                "of configured synthetic users."
+            )
+
+        if self.spawn_rate_per_sec <= 0:
+            raise WorkloadConfigurationError(
+                "spawn_rate_per_sec must be greater than zero."
+            )
+
+        if self.duration_sec < 30 or self.duration_sec > 3600:
+            raise WorkloadConfigurationError(
+                "duration_sec must be between 30 and 3600."
+            )
+
+        if not isinstance(
+            self.traffic_pattern,
+            TrafficPattern,
+        ):
+            raise WorkloadConfigurationError(
+                "traffic_pattern must be a supported "
+                "TrafficPattern value."
+            )
+
+        if not isinstance(
+            self.demand_profile,
+            DemandProfileName,
+        ):
+            raise WorkloadConfigurationError(
+                "demand_profile must be a supported "
+                "DemandProfileName value."
+            )
+
         unknown_hotspot_ids = (
             set(self.hotspot_seat_ids)
             - set(self.seat_ids)
@@ -180,6 +294,22 @@ class WorkloadConfig:
                 "Every hotspot seat must be part "
                 "of the experiment show."
             )
+
+        try:
+            validate_demand_configuration(
+                profile_name=self.demand_profile,
+                hotspot_ratio=Decimal(
+                    str(self.hotspot_ratio)
+                ),
+                hotspot_seat_count=len(
+                    self.hotspot_seat_ids
+                ),
+            )
+        except DemandProfileError as error:
+            raise WorkloadConfigurationError(
+                "Demand profile configuration is invalid: "
+                f"{error}"
+            ) from error
 
     @property
     def cold_seat_ids(self) -> tuple[int, ...]:
@@ -271,5 +401,20 @@ class WorkloadConfig:
             ),
             random_seed=_read_integer(
                 "LOAD_RANDOM_SEED"
+            ),
+            maximum_users=_read_positive_integer(
+                "LOAD_MAXIMUM_USERS"
+            ),
+            spawn_rate_per_sec=_read_positive_number(
+                "LOAD_SPAWN_RATE_PER_SEC"
+            ),
+            duration_sec=_read_positive_integer(
+                "LOAD_DURATION_SEC"
+            ),
+            traffic_pattern=_read_traffic_pattern(
+                "LOAD_TRAFFIC_PATTERN"
+            ),
+            demand_profile=_read_demand_profile(
+                "LOAD_DEMAND_PROFILE"
             ),
         )

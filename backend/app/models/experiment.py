@@ -59,6 +59,17 @@ class ExperimentRun(Base):
             "booking_mode IN ('NORMAL', 'EXPERIMENT_RECYCLE')",
             name="ck_experiment_runs_booking_mode",
         ),
+        CheckConstraint(
+            "traffic_pattern IN "
+            "('STEADY', 'RAMP', 'BURST', "
+            "'FLASH_SALE', 'COOLDOWN')",
+            name="ck_experiment_runs_traffic_pattern",
+        ),
+        CheckConstraint(
+            "demand_profile IN "
+            "('CUSTOM', 'LOW', 'MEDIUM', 'HIGH')",
+            name="ck_experiment_runs_demand_profile",
+        ),
         Index(
             "ix_experiment_runs_status_created",
             "status",
@@ -113,6 +124,18 @@ class ExperimentRun(Base):
     duration_sec: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
+    )
+    traffic_pattern: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="STEADY",
+        server_default="STEADY",
+    )
+    demand_profile: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="CUSTOM",
+        server_default="CUSTOM",
     )
     hotspot_ratio: Mapped[Decimal] = mapped_column(
         Numeric(5, 4),

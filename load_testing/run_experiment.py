@@ -21,6 +21,17 @@ from backend.app.models import (
     SyntheticUser,
 )
 from backend.app.models.enums import ExperimentStatus
+from load_testing.demand_profiles import (
+    DemandProfileError,
+    DemandProfileName,
+    parse_demand_profile_name,
+    validate_demand_configuration,
+)
+from load_testing.traffic_patterns import (
+    TrafficPattern,
+    TrafficPatternError,
+    parse_traffic_pattern,
+)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -42,11 +53,13 @@ class PreparedWorkload:
     user_count: int
     spawn_rate_per_sec: Decimal
     duration_sec: int
+    traffic_pattern: TrafficPattern
     hotspot_ratio: Decimal
     hotspot_seat_ids: tuple[int, ...]
     seat_ids: tuple[int, ...]
     user_ids: tuple[int, ...]
     random_seed: int
+    demand_profile: DemandProfileName = DemandProfileName.CUSTOM
 
 
 def _validate_host(host: str) -> str:
@@ -240,17 +253,47 @@ def prepare_workload(
             "the number of available synthetic users."
         )
 
+    try:
+        traffic_pattern = parse_traffic_pattern(
+            experiment.traffic_pattern
+        )
+    except TrafficPatternError as error:
+        raise WorkloadRunnerError(
+            "The experiment contains an unsupported "
+            f"traffic pattern: {experiment.traffic_pattern}."
+        ) from error
+
+    try:
+        demand_profile = parse_demand_profile_name(
+            experiment.demand_profile
+        )
+
+        validate_demand_configuration(
+            profile_name=demand_profile,
+            hotspot_ratio=experiment.hotspot_ratio,
+            hotspot_seat_count=len(
+                hotspot_seat_ids
+            ),
+        )
+    except DemandProfileError as error:
+        raise WorkloadRunnerError(
+            "The experiment contains an invalid demand "
+            f"profile configuration: {error}"
+        ) from error
+
     return PreparedWorkload(
         experiment_run_id=experiment.id,
         show_id=experiment.show_id,
         user_count=experiment.user_count,
         spawn_rate_per_sec=experiment.spawn_rate_per_sec,
         duration_sec=experiment.duration_sec,
+        traffic_pattern=traffic_pattern,
         hotspot_ratio=experiment.hotspot_ratio,
         hotspot_seat_ids=hotspot_seat_ids,
         seat_ids=seat_ids,
         user_ids=user_ids,
         random_seed=experiment.random_seed,
+        demand_profile=demand_profile,
     )
 
 
@@ -280,6 +323,21 @@ def build_child_environment(
         ),
         "LOAD_RANDOM_SEED": str(
             workload.random_seed
+        ),
+        "LOAD_MAXIMUM_USERS": str(
+            workload.user_count
+        ),
+        "LOAD_SPAWN_RATE_PER_SEC": str(
+            workload.spawn_rate_per_sec
+        ),
+        "LOAD_DURATION_SEC": str(
+            workload.duration_sec
+        ),
+        "LOAD_TRAFFIC_PATTERN": (
+            workload.traffic_pattern.value
+        ),
+        "LOAD_DEMAND_PROFILE": (
+            workload.demand_profile.value
         ),
         "LOAD_INTERNAL_API_TOKEN": _get_internal_token(),
     })
@@ -414,6 +472,14 @@ def main() -> int:
         )
         print(
             f"  Duration: {workload.duration_sec} seconds"
+        )
+        print(
+            "  Traffic pattern: "
+            f"{workload.traffic_pattern.value}"
+        )
+        print(
+            "  Demand profile: "
+            f"{workload.demand_profile.value}"
         )
         print(
             "  Hotspot ratio: "
