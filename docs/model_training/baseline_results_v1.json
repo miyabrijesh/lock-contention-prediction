@@ -1,0 +1,119 @@
+{
+  "checkpoint": "33B",
+  "dataset": {
+    "assignment_sha256": "4a24f55d3d1121f50da74ae3ec21cfba4a6f3f9044069edff7113d228c4c8374",
+    "feature_columns": [
+      "active_transactions",
+      "blocked_sessions",
+      "waiting_locks",
+      "total_locks",
+      "total_connections",
+      "connection_utilization",
+      "estimated_wait_age_ms",
+      "deadlock_delta",
+      "configured_users",
+      "active_users",
+      "requests_per_sec",
+      "mean_latency_ms",
+      "p95_latency_ms",
+      "failure_rate",
+      "hotspot_ratio",
+      "booking_success_rate",
+      "conflict_rate",
+      "timeout_rate"
+    ],
+    "feature_count": 18,
+    "target_column": "future_high_contention_30s",
+    "test": {
+      "reason": "Reserved for one-time final evaluation in Checkpoint 33D.",
+      "usage": "NOT_EVALUATED"
+    },
+    "training": {
+      "experiment_count": 42,
+      "file_sha256": "591e3e55dc560673b3ebd8529d1b0c56a393b88c551bef23c97b920a04fd3958",
+      "row_count": 1864
+    },
+    "validation": {
+      "experiment_count": 9,
+      "file_sha256": "10cd0aac9de7df07becd1c79dfb94e20a01b62bf1a25cb3db06eb376f2cc9092",
+      "row_count": 400
+    }
+  },
+  "evaluation": {
+    "classification_threshold": 0.5,
+    "model_selection_performed": false,
+    "split": "validation",
+    "threshold_selection_performed": false
+  },
+  "models": {
+    "dummy_prior": {
+      "metrics": {
+        "accuracy": 0.585,
+        "balanced_accuracy": 0.5,
+        "brier_score": 0.24277570041813257,
+        "confusion_matrix": {
+          "false_negative": 0,
+          "false_positive": 166,
+          "true_negative": 0,
+          "true_positive": 234
+        },
+        "f1": 0.7381703470031545,
+        "pr_auc": 0.585,
+        "precision": 0.585,
+        "predicted_negative": 0,
+        "predicted_positive": 400,
+        "recall": 1.0,
+        "roc_auc": 0.5,
+        "threshold": 0.5
+      },
+      "model_class": "sklearn.dummy.DummyClassifier"
+    },
+    "logistic_regression": {
+      "metrics": {
+        "accuracy": 0.845,
+        "balanced_accuracy": 0.8237565647204201,
+        "brier_score": 0.09348573370279249,
+        "confusion_matrix": {
+          "false_negative": 12,
+          "false_positive": 50,
+          "true_negative": 116,
+          "true_positive": 222
+        },
+        "f1": 0.8774703557312253,
+        "pr_auc": 0.9712086599820867,
+        "precision": 0.8161764705882353,
+        "predicted_negative": 128,
+        "predicted_positive": 272,
+        "recall": 0.9487179487179487,
+        "roc_auc": 0.9577283492946144,
+        "threshold": 0.5
+      },
+      "model_class": "sklearn.pipeline.Pipeline"
+    },
+    "random_forest": {
+      "metrics": {
+        "accuracy": 0.76,
+        "balanced_accuracy": 0.7336010709504686,
+        "brier_score": 0.14428834028499885,
+        "confusion_matrix": {
+          "false_negative": 26,
+          "false_positive": 70,
+          "true_negative": 96,
+          "true_positive": 208
+        },
+        "f1": 0.8125,
+        "pr_auc": 0.9302393863205604,
+        "precision": 0.7482014388489209,
+        "predicted_negative": 122,
+        "predicted_positive": 278,
+        "recall": 0.8888888888888888,
+        "roc_auc": 0.8889661208938318,
+        "threshold": 0.5
+      },
+      "model_class": "sklearn.ensemble._forest.RandomForestClassifier"
+    }
+  },
+  "random_seed": 3301,
+  "schema_version": "1.0.0",
+  "scikit_learn_version": "1.9.0"
+}
