@@ -1,230 +1,206 @@
-Checkpoint 31 Experiment Matrix Contract
+# Checkpoint 31 Experiment Matrix Contract
 
-Status: implementation baseline
+**Status:** Implementation complete
+**Matrix version:** `1.0.0`
 
-Matrix version: 1.0.0
+## Objective
 
-Objective
+Generate a reproducible training dataset containing multiple demand concentrations, time-varying traffic patterns, system-pressure levels, and random seeds.
 
-Generate a reproducible training dataset containing multiple demand
-concentrations, time-varying traffic patterns, system-pressure levels, and
-random seeds. This replaces reliance on the 89-row pilot dataset, which is
-useful for pipeline verification but too small for credible model evaluation.
+This replaces reliance on the 89-row pilot dataset, which was useful for pipeline verification but too small for credible model evaluation.
 
-Matrix dimensions
+## Matrix Dimensions
 
-Dimension
+| Dimension | Values | Count |
+|---|---|---:|
+| Traffic pattern | `STEADY`, `RAMP`, `BURST`, `FLASH_SALE`, `COOLDOWN` | 5 |
+| Demand profile | `LOW`, `MEDIUM`, `HIGH` | 3 |
+| Pressure level | `STANDARD`, `STRESSED` | 2 |
+| Random seed | `4101`, `4102` | 2 |
 
-Values
+The total number of planned experiment runs is:
 
-Count
+```text
+5 traffic patterns × 3 demand profiles × 2 pressure levels × 2 random seeds = 60 runs
+```
 
-Traffic pattern
+## Fixed Settings
 
-STEADY, RAMP, BURST, FLASH_SALE, COOLDOWN
+| Setting | Value |
+|---|---|
+| Experiment show | `2` |
+| Duration | 120 seconds |
+| Sampling interval | 2 seconds |
+| Prediction horizon | 30 seconds |
+| Booking mode | `EXPERIMENT_RECYCLE` |
 
-5
+A 120-second run sampled every two seconds produces approximately 60 metric samples.
 
-Demand profile
+Samples without a complete 30-second future window are excluded from the labelled dataset. This leaves approximately 44–45 labelled rows per experiment.
 
-LOW, MEDIUM, HIGH
+The initially estimated combined dataset size was approximately 2,700 rows.
 
-3
+## Demand-Profile Settings
 
-Pressure level
+| Profile | Hotspot ratio | Hotspot seats |
+|---|---:|---:|
+| `LOW` | 0.20 | 20 |
+| `MEDIUM` | 0.60 | 8 |
+| `HIGH` | 0.95 | 4 |
 
-STANDARD, STRESSED
+All values are within the tracked MovieLens-calibrated ranges.
 
-2
+The profiles represent demand concentration only. They do not provide contention labels.
 
-Random seed
+## Pressure Levels
 
-4101, 4102
+| Level | Users | Spawn rate | Simulated lock work |
+|---|---:|---:|---:|
+| `STANDARD` | 8 | 4 users/second | 75 ms |
+| `STRESSED` | 18 | 8 users/second | 250 ms |
 
-2
+Pressure is varied independently from demand concentration.
 
-Total experiment runs:
+Using only one pressure level for each demand profile would confound demand concentration with contention outcome. The independent pressure dimension allows the effect of demand concentration to be studied under different system loads.
 
-5 × 3 × 2 × 2 = 60
+## Hotspot-Seat Selection
 
-Fixed settings
+The matrix runner must:
 
-Setting
+1. Load available seats for experiment show `2`.
+2. Sort the seats by database ID.
+3. Select the first required number of seats for the chosen demand profile.
 
-Value
+The runner must not assume that seat IDs always begin at `101`.
 
-Experiment show
+## Scenario Identity
 
-2
+A scenario is uniquely identified by the combination of:
 
-Duration
+- Matrix version
+- Traffic pattern
+- Demand profile
+- Pressure level
+- Random seed
 
-120 seconds
+No duplicate scenario identity may appear in one matrix manifest.
 
-Sampling interval
-
-2 seconds
-
-Prediction horizon
-
-30 seconds
-
-Booking mode
-
-EXPERIMENT_RECYCLE
-
-A 120-second run sampled every 2 seconds produces approximately 60 metric
-samples. Removing samples without a complete 30-second future window should
-leave approximately 45 labelled rows per run. The expected combined dataset
-size is therefore approximately 2,700 rows.
-
-Demand-profile settings
-
-Profile
-
-Hotspot ratio
-
-Hotspot seats
-
-LOW
-
-0.20
-
-20
-
-MEDIUM
-
-0.60
-
-8
-
-HIGH
-
-0.95
-
-4
-
-All values are inside the tracked MovieLens-calibrated ranges. The profiles
-represent demand concentration only. They do not provide contention labels.
-
-Pressure levels
-
-Level
-
-Users
-
-Spawn rate
-
-Simulated lock work
-
-STANDARD
-
-8
-
-4 users/second
-
-75 ms
-
-STRESSED
-
-18
-
-8 users/second
-
-250 ms
-
-Pressure is varied independently from demand concentration. This is necessary
-because using only one pressure level per demand profile would confound demand
-profile with contention outcome.
-
-Hotspot-seat selection
-
-The matrix runner must load available seats for experiment show 2, sort them
-by database ID, and select the first required number for each demand profile.
-It must not assume that seat IDs always begin at 101.
-
-Run naming
+## Run Naming
 
 Each experiment name must include:
 
-matrix version
-
-demand profile
-
-traffic pattern
-
-pressure level
-
-random seed
+- Matrix version
+- Demand profile
+- Traffic pattern
+- Pressure level
+- Random seed
 
 Example:
 
-M31-v1-HIGH-BURST-STRESSED-seed4101
+```text
+M31-v1.0.0-HIGH-BURST-STRESSED-s4101
+```
 
-Lifecycle requirements
+The matrix manifest may use a longer scenario identity such as:
 
-For each run, the automation must:
+```text
+1.0.0-HIGH-BURST-STRESSED-seed4101
+```
 
-Verify no experiment is currently RUNNING.
+## Lifecycle Requirements
 
-Create a DRAFT experiment through the API.
+For every run, the automation must:
 
-Start the synchronized workload and metrics collector.
+1. Verify that no experiment is currently `RUNNING`.
+2. Create a `DRAFT` experiment through the API.
+3. Start the synchronized workload and metrics collector.
+4. Require successful completion of both child processes.
+5. Verify that the final experiment status is `COMPLETED`.
+6. Export the labelled experiment CSV.
+7. Record the result in the matrix execution manifest.
 
-Require successful completion of both child processes.
+Each recorded result must include:
 
-Verify final experiment status is COMPLETED.
+- Scenario configuration
+- Experiment run ID
+- Database status
+- Export path
+- Export row count
+- Export checksum
+- Attempt status
+- Start and end timestamps
+- Failure reason, when applicable
 
-Export the labelled experiment CSV.
+The matrix must stop on an unexpected infrastructure or validation error unless an explicit resume operation is requested.
 
-Record the experiment ID, configuration, export path, row count, checksum,
-status, and any failure reason in a matrix-run manifest.
+## Resume and Idempotency Requirements
 
-Stop the matrix on an unexpected infrastructure or validation error unless
-an explicit resume operation is requested.
+The runner must maintain an incremental manifest so interrupted data collection can resume without silently duplicating completed scenarios.
 
-Resume and idempotency requirements
+A resume operation must:
 
-The runner must maintain a manifest so interrupted collection can resume
-without silently duplicating completed scenarios. A scenario identity is the
-combination of matrix version, traffic pattern, demand profile, pressure level,
-and random seed.
+- Skip scenarios already marked `COMPLETED`.
+- Reuse a safe existing `DRAFT` or `COMPLETED` experiment when appropriate.
+- Reject an experiment that is unexpectedly still `RUNNING`.
+- Preserve previous attempt records.
+- Reject a changed matrix configuration when its checksum no longer matches the manifest.
 
-The automation must never delete previous experiments or exports. Rebuilding a
-dataset should create a new versioned combined file and manifest.
+The automation must never delete previous experiments or exports.
 
-Dataset-quality requirements
+Rebuilding a dataset must create a new versioned combined file and manifest rather than silently overwriting an existing version.
 
-Before the matrix is accepted:
+## Dataset-Quality Requirements
 
-every planned scenario must have a terminal status;
+Before the matrix dataset is accepted:
 
-successful runs must have metric samples and a registered data export;
+- Every planned scenario must have a terminal status.
+- Successful runs must contain metric samples.
+- Successful runs must have a registered data export.
+- Source-export checksums must match their files.
+- Both target labels must exist in the combined dataset.
+- Incomplete telemetry rows must be excluded.
+- Duplicate experiment and sample-timestamp pairs must be rejected.
+- Duplicate scenario identities must be rejected.
+- Experiment IDs must remain in the combined dataset.
+- The combined dataset checksum must match its manifest.
+- Label values must agree with their recorded future evidence.
 
-source export checksums must match their files;
+## Evaluation Leakage Rule
 
-both target labels must exist in the combined dataset;
+Rows from one experiment are temporally related.
 
-incomplete telemetry rows must be excluded;
+Rows belonging to the same `experiment_run_id` must never be divided across training, validation, and test sets.
 
-no duplicate scenario identity may appear in the matrix manifest;
+Model evaluation must group by complete experiments rather than randomly splitting individual rows.
 
-the combined dataset must preserve experiment IDs for grouped evaluation.
+Future-evidence columns used to create the target must never be supplied as model features.
 
-Evaluation leakage rule
+## Observed Checkpoint 31 Outcome
 
-Rows from one experiment are temporally related and must not be divided across
-training and test sets. Later model evaluation must split by
-experiment_run_id, not by randomly splitting individual rows.
+The completed matrix produced:
 
-Scientific limitations
+| Result | Observed value |
+|---|---:|
+| Planned scenarios | 60 |
+| Completed scenarios | 60 |
+| Running scenarios remaining | 0 |
+| Traffic patterns represented | 5 |
+| Demand profiles represented | 3 |
+| Metric samples collected | 3,600 |
+| Registered experiment exports | 60 |
+| Labelled rows produced | 2,666 |
+| Minimum rows per experiment | 44 |
+| Maximum rows per experiment | 45 |
+| Negative labels | 1,106 |
+| Positive labels | 1,560 |
 
-The reservations remain controlled synthetic transactions.
+The final combined dataset contains approximately 41.5% negative labels and 58.5% positive labels.
 
-MovieLens supplies real-world popularity concentration, not ticket purchases
-or database-lock measurements.
+## Scientific Limitations
 
-Results initially describe the local PostgreSQL instance and Mac hardware.
-
-More seeds, pressure levels, hardware environments, and real operational
-traces may be added later as new versioned datasets.
+- Reservations remain controlled synthetic transactions.
+- MovieLens supplies real-world popularity concentration, not ticket purchases or database-lock measurements.
+- Contention labels come from measured PostgreSQL and booking telemetry.
+- Results initially describe the local PostgreSQL instance and Mac hardware used for collection.
+- The dataset contains two random seeds per matrix combination, which is sufficient for the baseline but not for broad statistical generalisation.
+- Additional seeds, pressure levels, hardware environments, database configurations, and real operational traces may be introduced later as new versioned datasets.
