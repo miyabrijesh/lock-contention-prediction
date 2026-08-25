@@ -1,0 +1,178 @@
+{
+  "assignment_sha256": "4a24f55d3d1121f50da74ae3ec21cfba4a6f3f9044069edff7113d228c4c8374",
+  "created_at": "2026-08-25T10:23:07.529194+00:00",
+  "source_dataset_file": "data/processed/contention_training_dataset_v1.csv",
+  "source_dataset_manifest_file": "data/processed/contention_training_dataset_v1.manifest.json",
+  "source_dataset_manifest_sha256": "fd7816a687c9065a0a06038533253a5cf438dd9084aa6ba6b01c35a1b9b750af",
+  "source_dataset_sha256": "14e759143a5adf77f13d578bfccf2b448176c1abe61d8b32a1937c26c213d58b",
+  "split_schema_version": "1.0.0",
+  "split_seed": 3201,
+  "splits": {
+    "test": {
+      "experiment_count": 9,
+      "experiment_ids": [
+        "1506693d-8c92-4b6a-b7c6-23fafcdebbc0",
+        "205e8f8a-6881-4303-bb2a-e0aeab301662",
+        "232b24fd-0465-4f92-842e-3d4375b74078",
+        "2ba01128-c6b1-43fb-8efc-10b49627a924",
+        "9a0958a6-88e1-42b9-ba70-b4953d6c8cb6",
+        "9e895429-987e-4181-8b47-6d071d59cb3a",
+        "d0b9b373-f592-4124-85a3-33a2b60804ec",
+        "dfeb53fd-ac77-47a0-970b-c7d9119e4616",
+        "ec7a04f3-0810-46de-a6b9-8d7ed35ab3c3"
+      ],
+      "file": "data/processed/splits/contention_training_dataset_v1/test.csv",
+      "file_sha256": "71b4cf3befcd0661aa2954aef2e7d431c08653f676e9998ca9bfa6cb81e7f0b8",
+      "label_distribution": {
+        "negative": 168,
+        "positive": 234
+      },
+      "matrix_coverage": {
+        "demand_profiles": [
+          "HIGH",
+          "LOW",
+          "MEDIUM"
+        ],
+        "pressure_levels": [
+          "STANDARD",
+          "STRESSED"
+        ],
+        "random_seeds": [
+          4101,
+          4102
+        ],
+        "traffic_patterns": [
+          "BURST",
+          "COOLDOWN",
+          "FLASH_SALE",
+          "RAMP",
+          "STEADY"
+        ]
+      },
+      "row_count": 402
+    },
+    "train": {
+      "experiment_count": 42,
+      "experiment_ids": [
+        "0595fd05-a51b-457c-b8f6-cecd2d294b24",
+        "05a903b1-929c-4edb-ab10-5871c72f81ae",
+        "11da201e-2dee-4c74-a078-c47ea1ea6824",
+        "150959ab-ee68-421e-ab13-1d4516279493",
+        "19e2f3bd-ef6e-4e21-96e3-d5af84ec65af",
+        "1ad87aa1-af3d-48d1-b7b9-8cd47ecd3d07",
+        "1c07f30d-c209-4a16-98f1-42a00eb0fc03",
+        "1c517778-aa50-4e8f-89dc-58199923a25d",
+        "26609b6e-6656-4e88-86f7-43453a569fe9",
+        "302ad5c7-add0-4d31-ac72-1556115812a1",
+        "3134605e-0612-40d0-baeb-a27ccdc0b4cd",
+        "329c7acf-2562-48a1-809a-e3a2c2bfac1f",
+        "3628ddfd-3131-467d-bab5-61c83388e661",
+        "3deb3669-d69d-4b3f-8a4d-e5b99f0fe4a3",
+        "461d5e75-f59f-4689-a4c4-5b8c4f2e5a24",
+        "521166c4-22f1-4509-ab5e-2af588e1f394",
+        "5a073ed2-c675-4fce-b865-d70e4a89b395",
+        "5dfa5e16-bd40-4ec7-a3d4-eaa6f9019350",
+        "6b38734f-4fe5-4e11-b8ba-9bbeac034298",
+        "6b7b76eb-38a5-40e4-8b4e-571ebbe56a66",
+        "6e423efb-22be-46b5-8a92-763f017a65ba",
+        "7232275f-2575-4249-b5fc-ad2ce5e26d05",
+        "72bd18fc-c18d-4ac7-ae3e-bb910de62323",
+        "7552be81-cfea-4dea-8330-93d8373b6f72",
+        "757e3981-a1a7-48c3-83ca-28fa3d2ec5e4",
+        "7ae800cc-38fd-40b7-8746-ace538cbce81",
+        "83c091d6-ad63-43f8-b81a-8b5a96a84a6c",
+        "8a23823d-ef8b-4f3d-802c-007ca3b7a7c3",
+        "aaeb8c03-fff3-4c39-ae5b-5c6a45c2e8ad",
+        "b4b5ae56-c56c-4432-8855-d8ba375e610c",
+        "c352aaa6-ab17-4321-a9a5-6e865e2fe4a4",
+        "c3b08b0b-d5e3-4270-913e-0aed3dd56dec",
+        "ce0f1e90-d76f-40b8-a904-7e0067d61fd3",
+        "d2bb924b-6dd7-46f0-b695-5023d3181cde",
+        "e25e4f11-f7d5-4255-bccc-c4cf06768794",
+        "e787da70-e1db-452b-9e7c-b93660563987",
+        "e7b40b77-6610-492d-904e-b961e242d509",
+        "e7da7e73-b17b-492c-9b0e-8413ae6c5702",
+        "f2219b85-dab0-45a7-a0a2-59569aac223b",
+        "f352d9d1-5e23-4402-ae6e-4ec06740fa40",
+        "fc24f98b-883f-46d4-9cc2-5bef806fe67e",
+        "fd579252-2205-4e8e-b8c6-10c64709df00"
+      ],
+      "file": "data/processed/splits/contention_training_dataset_v1/train.csv",
+      "file_sha256": "591e3e55dc560673b3ebd8529d1b0c56a393b88c551bef23c97b920a04fd3958",
+      "label_distribution": {
+        "negative": 772,
+        "positive": 1092
+      },
+      "matrix_coverage": {
+        "demand_profiles": [
+          "HIGH",
+          "LOW",
+          "MEDIUM"
+        ],
+        "pressure_levels": [
+          "STANDARD",
+          "STRESSED"
+        ],
+        "random_seeds": [
+          4101,
+          4102
+        ],
+        "traffic_patterns": [
+          "BURST",
+          "COOLDOWN",
+          "FLASH_SALE",
+          "RAMP",
+          "STEADY"
+        ]
+      },
+      "row_count": 1864
+    },
+    "validation": {
+      "experiment_count": 9,
+      "experiment_ids": [
+        "0a18d3f4-0011-4bc6-ac07-884c911a40aa",
+        "4da5cbc6-9026-4aed-b63b-69adb0880b03",
+        "68f73d8f-874f-40ef-807b-9aecd97eeb04",
+        "71b3cae6-e168-4faf-bc55-f32b23b44895",
+        "7f123256-630c-4fa2-83e2-86a4841767c5",
+        "ac38ad12-da4c-4d23-a868-85151c164e29",
+        "da43a359-eee9-490a-af54-591171beadfd",
+        "dd624147-8cfe-4929-9109-3158a533e460",
+        "fcd10b72-c928-4ad1-819f-6ace95321d20"
+      ],
+      "file": "data/processed/splits/contention_training_dataset_v1/validation.csv",
+      "file_sha256": "10cd0aac9de7df07becd1c79dfb94e20a01b62bf1a25cb3db06eb376f2cc9092",
+      "label_distribution": {
+        "negative": 166,
+        "positive": 234
+      },
+      "matrix_coverage": {
+        "demand_profiles": [
+          "HIGH",
+          "LOW",
+          "MEDIUM"
+        ],
+        "pressure_levels": [
+          "STANDARD",
+          "STRESSED"
+        ],
+        "random_seeds": [
+          4101,
+          4102
+        ],
+        "traffic_patterns": [
+          "BURST",
+          "COOLDOWN",
+          "FLASH_SALE",
+          "RAMP",
+          "STEADY"
+        ]
+      },
+      "row_count": 400
+    }
+  },
+  "strategy": "grouped_by_experiment_with_matrix_coverage",
+  "target_column": "future_high_contention_30s",
+  "total_experiment_count": 60,
+  "total_row_count": 2666
+}
