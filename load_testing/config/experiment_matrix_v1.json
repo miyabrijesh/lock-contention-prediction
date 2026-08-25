@@ -1,0 +1,50 @@
+{
+    "schema_version": "1.0.0",
+    "matrix_name": "checkpoint_31_training_matrix_v1",
+    "show_id": 2,
+    "duration_sec": 120,
+    "sample_interval_sec": 2,
+    "booking_mode": "EXPERIMENT_RECYCLE",
+    "created_by": "local-admin",
+    "traffic_patterns": [
+        "STEADY",
+        "RAMP",
+        "BURST",
+        "FLASH_SALE",
+        "COOLDOWN"
+    ],
+    "demand_profiles": {
+        "LOW": {
+            "hotspot_ratio": "0.20",
+            "hotspot_seat_count": 20
+        },
+        "MEDIUM": {
+            "hotspot_ratio": "0.60",
+            "hotspot_seat_count": 8
+        },
+        "HIGH": {
+            "hotspot_ratio": "0.95",
+            "hotspot_seat_count": 4
+        }
+    },
+    "pressure_levels": {
+        "STANDARD": {
+            "user_count": 8,
+            "spawn_rate_per_sec": "4.00",
+            "simulated_work_ms": 75
+        },
+        "STRESSED": {
+            "user_count": 18,
+            "spawn_rate_per_sec": "8.00",
+            "simulated_work_ms": 250
+        }
+    },
+    "random_seeds": [
+        4101,
+        4102
+    ],
+    "expected_run_count": 60,
+    "prediction_horizon_seconds": 30,
+    "estimated_labelled_rows_per_run": 45,
+    "estimated_total_labelled_rows": 2700
+}
