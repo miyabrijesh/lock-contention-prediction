@@ -1,0 +1,79 @@
+{
+  "checkpoint": "33D",
+  "dataset": {
+    "assignment_sha256": "4a24f55d3d1121f50da74ae3ec21cfba4a6f3f9044069edff7113d228c4c8374",
+    "experiment_count": 9,
+    "feature_columns": [
+      "active_transactions",
+      "blocked_sessions",
+      "waiting_locks",
+      "total_locks",
+      "total_connections",
+      "connection_utilization",
+      "estimated_wait_age_ms",
+      "deadlock_delta",
+      "configured_users",
+      "active_users",
+      "requests_per_sec",
+      "mean_latency_ms",
+      "p95_latency_ms",
+      "failure_rate",
+      "hotspot_ratio",
+      "booking_success_rate",
+      "conflict_rate",
+      "timeout_rate"
+    ],
+    "feature_count": 18,
+    "negative_label_count": 168,
+    "positive_label_count": 234,
+    "row_count": 402,
+    "split": "test",
+    "target_column": "future_high_contention_30s",
+    "test_file_sha256": "71b4cf3befcd0661aa2954aef2e7d431c08653f676e9998ca9bfa6cb81e7f0b8"
+  },
+  "evaluation_status": "FINAL_TEST_EVALUATION_COMPLETED",
+  "generalization_difference": {
+    "test_minus_validation_f2": 0.009018819732504402,
+    "test_minus_validation_precision": 0.06381508482189135,
+    "test_minus_validation_recall": -0.012820512820512886
+  },
+  "interpretation_boundary": {
+    "model_retrained_during_test_evaluation": false,
+    "results_describe_current_frozen_dataset": true,
+    "test_split_used_for_model_selection": false,
+    "test_split_used_for_threshold_selection": false
+  },
+  "model": {
+    "classification_threshold": 0.34,
+    "model_name": "logistic_regression",
+    "model_sha256": "e255db6ee5d3a59c075b6249fc7d355e5107dd56b2ed7ddab695bb029db24704",
+    "selection_report_sha256": "0b9e32b386fdbe57da519b2c7b15efc1a1f973aab92beebefa865281e83ff3d0"
+  },
+  "one_time_evaluation": true,
+  "schema_version": "1.0.0",
+  "test_metrics": {
+    "accuracy": 0.8532338308457711,
+    "balanced_accuracy": 0.8294413919413919,
+    "brier_score": 0.07084622891578644,
+    "confusion_matrix": {
+      "false_negative": 6,
+      "false_positive": 53,
+      "true_negative": 115,
+      "true_positive": 228
+    },
+    "f1": 0.8854368932038835,
+    "f2": 0.9367296631059984,
+    "pr_auc": 0.982184729811235,
+    "precision": 0.8113879003558719,
+    "predicted_negative": 121,
+    "predicted_positive": 281,
+    "recall": 0.9743589743589743,
+    "roc_auc": 0.9707977207977208,
+    "threshold": 0.34
+  },
+  "validation_reference": {
+    "f2": 0.927710843373494,
+    "precision": 0.7475728155339806,
+    "recall": 0.9871794871794872
+  }
+}
