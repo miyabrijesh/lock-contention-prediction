@@ -31,3 +31,6 @@ ml/models/*
 !ml/models/.gitkeep
 
 data/exports/
+
+# External research datasets — download locally, never commit
+data/external/

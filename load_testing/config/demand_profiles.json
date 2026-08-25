@@ -1,0 +1,83 @@
+{
+  "created_at": "2026-08-25T03:50:06.806343+00:00",
+  "mapping_methodology": {
+    "experimental_component": "Hotspot-ratio and seat-count ranges are controlled reservation-system parameters.",
+    "label_rule": "Contention labels come only from future PostgreSQL telemetry.",
+    "real_world_component": "Movie and interaction shares are calculated from MovieLens rating counts.",
+    "simulated_work_rule": "Lock-hold duration remains an independent experimental variable and is not derived from MovieLens."
+  },
+  "profile_version": "1.0.0",
+  "profiles": {
+    "HIGH": {
+      "description": "Demand is strongly concentrated on a very small seat group.",
+      "hotspot_ratio_range": {
+        "maximum": "1.00",
+        "minimum": "0.85"
+      },
+      "hotspot_seat_count_range": {
+        "maximum": 5,
+        "minimum": 3
+      },
+      "interaction_density_index": "4.566412",
+      "interaction_share": "0.457464",
+      "movie_share": "0.100180",
+      "relative_density_to_medium": "3.833681",
+      "source_movie_count": 389,
+      "source_rating_count": 457560,
+      "workload_levels": [
+        "HIGH",
+        "EXTREME"
+      ]
+    },
+    "LOW": {
+      "description": "Demand is distributed across many seats with limited hotspot concentration.",
+      "hotspot_ratio_range": {
+        "maximum": "0.30",
+        "minimum": "0.10"
+      },
+      "hotspot_seat_count_range": {
+        "maximum": 25,
+        "minimum": 15
+      },
+      "interaction_density_index": "0.131778",
+      "interaction_share": "0.065838",
+      "movie_share": "0.499614",
+      "relative_density_to_medium": "0.110633",
+      "source_movie_count": 1940,
+      "source_rating_count": 65852,
+      "workload_levels": [
+        "VERY_LOW",
+        "LOW"
+      ]
+    },
+    "MEDIUM": {
+      "description": "Demand is moderately concentrated and may cross the contention boundary.",
+      "hotspot_ratio_range": {
+        "maximum": "0.80",
+        "minimum": "0.40"
+      },
+      "hotspot_seat_count_range": {
+        "maximum": 12,
+        "minimum": 5
+      },
+      "interaction_density_index": "1.191130",
+      "interaction_share": "0.476697",
+      "movie_share": "0.400206",
+      "relative_density_to_medium": "1.000000",
+      "source_movie_count": 1554,
+      "source_rating_count": 476797,
+      "workload_levels": [
+        "BORDERLINE",
+        "MEDIUM"
+      ]
+    }
+  },
+  "source": {
+    "archive_sha256": "a6898adb50b9ca05aa231689da44c217cb524e7ebd39d264c56e2832f2c54e20",
+    "calibration_output_sha256": "b89d3c6dd199f40e512ff0991aa6e1c20b22e3bf58da27cb2343dcd2fdc408b2",
+    "calibration_summary": "docs/data/movielens_calibration_summary.json",
+    "dataset_name": "MovieLens 1M",
+    "movie_count": 3883,
+    "rating_count": 1000209
+  }
+}

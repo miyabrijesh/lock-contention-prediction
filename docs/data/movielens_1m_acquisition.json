@@ -1,0 +1,17 @@
+{
+  "dataset_name": "MovieLens 1M",
+  "publisher": "GroupLens Research, University of Minnesota",
+  "source_url": "https://files.grouplens.org/datasets/movielens/ml-1m.zip",
+  "documentation_url": "https://files.grouplens.org/datasets/movielens/ml-1m-README.txt",
+  "downloaded_at": "2026-08-25T03:28:06.212976+00:00",
+  "archive_file": "data/external/movielens/ml-1m.zip",
+  "archive_size_bytes": 5917549,
+  "archive_md5": "c4d9eecfca2ab87c1945afe126590906",
+  "archive_sha256": "a6898adb50b9ca05aa231689da44c217cb524e7ebd39d264c56e2832f2c54e20",
+  "files": {
+    "ratings.dat": 1000209,
+    "movies.dat": 3883,
+    "users.dat": 6040
+  },
+  "redistribute_raw_data": false
+}
