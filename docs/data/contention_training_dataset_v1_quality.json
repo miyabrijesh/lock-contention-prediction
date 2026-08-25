@@ -1,0 +1,32 @@
+{
+  "audit_schema_version": "1.0.0",
+  "checks": {
+    "class_balance": "PASS",
+    "csv_schema": "PASS",
+    "dataset_checksum": "PASS",
+    "execution_manifest_checksum": "PASS",
+    "experiment_metadata_consistency": "PASS",
+    "future_label_consistency": "PASS",
+    "numeric_ranges": "PASS",
+    "required_values": "PASS",
+    "source_export_checksums": "PASS",
+    "unique_sample_keys": "PASS"
+  },
+  "created_at": "2026-08-25T10:02:30.471217+00:00",
+  "dataset_file": "data/processed/contention_training_dataset_v1.csv",
+  "dataset_sha256": "14e759143a5adf77f13d578bfccf2b448176c1abe61d8b32a1937c26c213d58b",
+  "experiment_count": 60,
+  "label_distribution": {
+    "negative": 1106,
+    "negative_fraction": "0.4148537134283570892723180795",
+    "positive": 1560,
+    "positive_fraction": "0.5851462865716429107276819205"
+  },
+  "manifest_file": "data/processed/contention_training_dataset_v1.manifest.json",
+  "row_count": 2666,
+  "rows_per_experiment": {
+    "maximum": 45,
+    "minimum": 44
+  },
+  "status": "PASS"
+}
