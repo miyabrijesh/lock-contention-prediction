@@ -338,10 +338,10 @@ def _validate_registered_provenance(
         )
 
 
-def _load_and_validate_artifact(
+def load_validated_predictor(
     model_version: ModelVersion,
-) -> None:
-    """Load the artifact and validate registered provenance."""
+) -> ContentionPredictor:
+    """Load and validate one registered model artifact."""
 
     artifact_path = _resolve_artifact_path(
         model_version.artifact_path
@@ -371,6 +371,8 @@ def _load_and_validate_artifact(
         model_version,
         predictor,
     )
+
+    return predictor
 
 
 def list_registered_models(
@@ -477,7 +479,7 @@ def activate_model_version(
                 status_code=404,
             )
 
-        _load_and_validate_artifact(
+        load_validated_predictor(
             requested_model
         )
 
