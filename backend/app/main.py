@@ -1,9 +1,20 @@
 from fastapi import FastAPI
 
-from backend.app.api.routes.bookings import router as bookings_router
-from backend.app.api.routes.experiments import router as experiments_router
-from backend.app.api.routes.health import router as health_router
-from backend.app.api.routes.shows import router as shows_router
+from backend.app.api.routes.bookings import (
+    router as bookings_router,
+)
+from backend.app.api.routes.experiments import (
+    router as experiments_router,
+)
+from backend.app.api.routes.health import (
+    router as health_router,
+)
+from backend.app.api.routes.models import (
+    router as models_router,
+)
+from backend.app.api.routes.shows import (
+    router as shows_router,
+)
 
 
 app = FastAPI(
@@ -20,6 +31,7 @@ app.include_router(health_router)
 app.include_router(shows_router)
 app.include_router(bookings_router)
 app.include_router(experiments_router)
+app.include_router(models_router)
 
 
 @app.get(
