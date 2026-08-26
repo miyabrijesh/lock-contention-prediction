@@ -12,6 +12,9 @@ from backend.app.api.routes.health import (
 from backend.app.api.routes.models import (
     router as models_router,
 )
+from backend.app.api.routes.predictions import (
+    router as predictions_router,
+)
 from backend.app.api.routes.shows import (
     router as shows_router,
 )
@@ -32,6 +35,7 @@ app.include_router(shows_router)
 app.include_router(bookings_router)
 app.include_router(experiments_router)
 app.include_router(models_router)
+app.include_router(predictions_router)
 
 
 @app.get(
