@@ -186,7 +186,15 @@ def run_collector(
             "waiting_locks="
             f"{result.sample.waiting_locks}, "
             "p95_latency_ms="
-            f"{result.sample.p95_latency_ms}"
+            f"{result.sample.p95_latency_ms}, "
+            "prediction_probability="
+            f"{result.prediction.probability}, "
+            "risk_level="
+            f"{result.prediction.risk_level.value}, "
+            "threshold="
+            f"{result.prediction.threshold_used}, "
+            "stale="
+            f"{result.prediction.is_stale}"
         )
 
         next_sample_at += (

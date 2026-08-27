@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from backend.app.models import (
     ExperimentRun,
     MetricSample,
+    Prediction,
 )
 from backend.app.models.enums import ExperimentStatus
 from monitoring.application_metrics import (
@@ -18,8 +19,12 @@ from monitoring.postgres_metrics import (
     collect_postgresql_metrics,
 )
 
+from backend.app.services.prediction_service import (
+    PredictionServiceError,
+    create_prediction_for_metric_sample,
+)
 
-COLLECTOR_VERSION = "checkpoint-26-v1"
+COLLECTOR_VERSION = "checkpoint-38-v1"
 
 
 @dataclass(frozen=True)
@@ -27,6 +32,7 @@ class MetricCollectionResult:
     """Result of collecting and persisting one metric sample."""
 
     sample: MetricSample
+    prediction: Prediction
     cumulative_deadlocks: int
 
 
@@ -215,8 +221,23 @@ def collect_and_persist_metric_sample(
         session.commit()
         session.refresh(sample)
 
+        try:
+            prediction = (
+                create_prediction_for_metric_sample(
+                    session,
+                    sample.id,
+                )
+            )
+        except PredictionServiceError as error:
+            raise MetricCollectorError(
+                "The metric sample was persisted, but "
+                "automatic prediction failed with "
+                f"{error.code}."
+            ) from error
+
         return MetricCollectionResult(
             sample=sample,
+            prediction=prediction,
             cumulative_deadlocks=(
                 database_metrics.cumulative_deadlocks
             ),
