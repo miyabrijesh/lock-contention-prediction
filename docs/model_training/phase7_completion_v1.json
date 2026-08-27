@@ -1,0 +1,104 @@
+{
+  "active_model": {
+    "algorithm": "StandardScaler + LogisticRegression",
+    "artifact_path": "artifacts/models/contention_candidate_v1.joblib",
+    "artifact_sha256": "e255db6ee5d3a59c075b6249fc7d355e5107dd56b2ed7ddab695bb029db24704",
+    "code_version": "a9c0a22eee74a3e5e86f2cf330bcc7896cbcc919",
+    "is_active": true,
+    "model_version_id": "ce84e90c-61f3-4247-bc7f-3737711674d3",
+    "name": "contention-logistic-v1",
+    "target_horizon_seconds": 30
+  },
+  "capabilities": {
+    "authenticated_prediction_api": true,
+    "automatic_prediction_persistence": true,
+    "controlled_model_activation": true,
+    "prediction_coverage_monitoring": true,
+    "prediction_failure_isolation": true,
+    "synchronized_demo_workflow": true
+  },
+  "checkpoints": {
+    "35A": "COMPLETED",
+    "35B": "COMPLETED",
+    "35C": "COMPLETED",
+    "35D": "COMPLETED",
+    "36A": "COMPLETED",
+    "36B": "COMPLETED",
+    "36C": "COMPLETED",
+    "36D": "COMPLETED",
+    "37A": "COMPLETED",
+    "37B": "COMPLETED",
+    "37C": "COMPLETED",
+    "37D": "COMPLETED",
+    "38A": "COMPLETED",
+    "38B": "COMPLETED",
+    "38C": "COMPLETED",
+    "38D": "COMPLETED",
+    "39A": "COMPLETED",
+    "39B": "COMPLETED",
+    "39C": "COMPLETED",
+    "39D": "FINALIZATION_PENDING"
+  },
+  "completion_scope": "model_activation_live_prediction_integration_and_demonstration",
+  "database": {
+    "expected_revision": "a91f6c8d2e47",
+    "is_current": true,
+    "phase7_migration_required": false,
+    "revision": "a91f6c8d2e47"
+  },
+  "documentation": {
+    "automatic_prediction_transaction_boundary": true,
+    "demonstration_workflow_documented": true,
+    "files": {
+      "docs/demo/phase7_end_to_end_demo.md": {
+        "sha256": "0103d693d0c0842483b2f0472f4d67900046d8d8e977fe0faf60f743bf6ecce1"
+      },
+      "docs/model_training/automatic_prediction_contract_v1.md": {
+        "sha256": "653502dae4b3bf58b28065e5b59c783b4156e38f0341508308eed1bb4192518e"
+      },
+      "docs/model_training/model_activation_contract_v1.md": {
+        "sha256": "4b25d09aeb2b28a01896045b2f842dce08521dcc74a79f5dd550ac0ae70cfb84"
+      },
+      "docs/model_training/prediction_api_contract_v1.md": {
+        "sha256": "60d03f9c971b56da293ac9116b8e792f9ff3ee5b90c385c55e93ede68a3edea4"
+      },
+      "docs/model_training/prediction_persistence_contract_v1.md": {
+        "sha256": "0f00eaa5433484b0a8dbc427e9d1a469ee5f30b76a4184d6d6caba7872947853"
+      }
+    },
+    "required_file_count": 5
+  },
+  "finalization_boundary": {
+    "final_test_and_documentation_review": "PENDING_39D",
+    "phase7_technical_verification": "COMPLETED"
+  },
+  "limitations": [
+    "The demonstration uses a controlled local PostgreSQL workload.",
+    "The workload is not traffic from a commercial ticketing platform.",
+    "Model performance was evaluated on controlled collected experiments.",
+    "Production deployment requires continued monitoring and validation."
+  ],
+  "live_experiment": {
+    "collector_versions": [
+      "checkpoint-38-v1"
+    ],
+    "complete_sample_count": 15,
+    "coverage": "1",
+    "distinct_predicted_sample_count": 15,
+    "duplicate_prediction_count": 0,
+    "experiment_run_id": "f5bbb656-c419-4032-b96f-7f3338c012d2",
+    "labeled_prediction_count": 0,
+    "missing_prediction_count": 0,
+    "model_version_count": 1,
+    "passed": true,
+    "prediction_count": 15,
+    "prediction_model_version_ids": [
+      "ce84e90c-61f3-4247-bc7f-3737711674d3"
+    ],
+    "stale_prediction_count": 0,
+    "status": "COMPLETED"
+  },
+  "phase": 7,
+  "schema_version": "1.0.0",
+  "status": "VERIFIED"
+}
