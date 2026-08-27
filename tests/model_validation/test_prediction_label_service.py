@@ -705,11 +705,10 @@ def test_noncompleted_experiment_remains_unlabeled(
         prediction.id,
     )
 
-
-def test_missing_future_sample_is_insufficient(
+def test_fourteen_sample_jitter_window_is_accepted(
     db_session: Session,
 ) -> None:
-    """Refuse a future window with only 14 samples."""
+    """Accept 14 samples with complete boundary coverage."""
 
     experiment = _create_experiment(
         db_session
@@ -756,20 +755,168 @@ def test_missing_future_sample_is_insufficient(
     )
 
     assert result.status == (
-        PredictionLabelStatus
-        .INSUFFICIENT_FUTURE_COVERAGE
+        PredictionLabelStatus.LABELED_NEGATIVE
     )
+    assert result.actual_label is False
     assert result.future_sample_count == 14
     assert (
         result.expected_future_sample_count
         == 15
     )
 
+    db_session.refresh(prediction)
+
+    assert prediction.actual_label is False
+    assert (
+        prediction.actual_label_contract_version
+        == LIVE_LABEL_CONTRACT_VERSION
+    )
+
+    evidence = prediction.actual_label_evidence
+
+    assert evidence is not None
+    assert evidence["future_sample_count"] == 14
+    assert (
+        evidence["expected_future_sample_count"]
+        == 15
+    )
+    assert (
+        evidence["minimum_future_sample_count"]
+        == 14
+    )
+    assert evidence["first_boundary_gap_ms"] == 2000
+    assert evidence["final_boundary_gap_ms"] == 2000
+    assert evidence["maximum_sample_gap_ms"] == 2000
+    assert evidence["maximum_allowed_gap_ms"] == 3500
+
+
+def test_missing_start_boundary_is_insufficient(
+    db_session: Session,
+) -> None:
+    """Reject evidence beginning too far after the start."""
+
+    experiment = _create_experiment(
+        db_session
+    )
+    model_version = _create_model_version(
+        db_session
+    )
+    window_start = _historical_window_start()
+
+    prediction = _create_prediction(
+        db_session,
+        experiment=experiment,
+        model_version=model_version,
+        window_start=window_start,
+    )
+
+    for offset in range(4, 31, 2):
+        _create_metric_sample(
+            db_session,
+            experiment=experiment,
+            sampled_at=(
+                window_start
+                + timedelta(seconds=offset)
+            ),
+        )
+
+    result = assign_actual_label(
+        db_session,
+        prediction.id,
+        current_time=(
+            prediction.target_window_end
+            + timedelta(seconds=1)
+        ),
+    )
+
+    assert result.status == (
+        PredictionLabelStatus
+        .INSUFFICIENT_FUTURE_COVERAGE
+    )
+    assert result.future_sample_count == 14
+
     _assert_prediction_is_unlabeled(
         db_session,
         prediction.id,
     )
 
+
+def test_missing_end_boundary_is_insufficient(
+    db_session: Session,
+) -> None:
+    """Reject evidence ending too far before the end."""
+
+    experiment = _create_experiment(
+        db_session
+    )
+    model_version = _create_model_version(
+        db_session
+    )
+    window_start = _historical_window_start()
+
+    prediction = _create_prediction(
+        db_session,
+        experiment=experiment,
+        model_version=model_version,
+        window_start=window_start,
+    )
+
+    offsets = [
+        2,
+        4,
+        6,
+        8,
+        10,
+        12,
+        14,
+        16,
+        18,
+        20,
+        22,
+        24,
+        25,
+        26,
+    ]
+
+    for offset in offsets:
+        _create_metric_sample(
+            db_session,
+            experiment=experiment,
+            sampled_at=(
+                window_start
+                + timedelta(seconds=offset)
+            ),
+        )
+
+    # Prove that collection continued beyond the horizon.
+    _create_metric_sample(
+        db_session,
+        experiment=experiment,
+        sampled_at=(
+            window_start
+            + timedelta(seconds=32)
+        ),
+    )
+
+    result = assign_actual_label(
+        db_session,
+        prediction.id,
+        current_time=(
+            prediction.target_window_end
+            + timedelta(seconds=2)
+        ),
+    )
+
+    assert result.status == (
+        PredictionLabelStatus
+        .INSUFFICIENT_FUTURE_COVERAGE
+    )
+    assert result.future_sample_count == 14
+
+    _assert_prediction_is_unlabeled(
+        db_session,
+        prediction.id,
+    )
 
 def test_excessive_sample_gap_is_insufficient(
     db_session: Session,

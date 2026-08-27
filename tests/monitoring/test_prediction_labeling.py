@@ -238,7 +238,7 @@ def test_batch_aggregates_label_results(
         window_start=second_start,
     )
 
-    for index in range(1, 15):
+    for index in range(1, 14):
         _create_metric_sample(
             db_session,
             experiment=experiment,

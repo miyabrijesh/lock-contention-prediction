@@ -21,7 +21,7 @@ from backend.app.repositories.prediction_repository import (
 
 
 LIVE_LABEL_CONTRACT_VERSION: Final[str] = (
-    "live-label-v1"
+    "live-label-v2"
 )
 
 PREDICTION_HORIZON_SECONDS: Final[int] = 30
@@ -174,7 +174,48 @@ def _maximum_sample_gap_ms(
 
     return max(gaps)
 
+def _boundary_sample_gaps_ms(
+    samples: list[MetricSample],
+    *,
+    target_window_start: datetime,
+    target_window_end: datetime,
+) -> tuple[int, int]:
+    """Return start and end boundary coverage gaps."""
 
+    if not samples:
+        raise _InvalidFutureEvidence(
+            "Boundary gaps require future samples."
+        )
+
+    first_boundary_gap_ms = round(
+        (
+            samples[0].sampled_at
+            - target_window_start
+        ).total_seconds()
+        * 1000
+    )
+
+    final_boundary_gap_ms = round(
+        (
+            target_window_end
+            - samples[-1].sampled_at
+        ).total_seconds()
+        * 1000
+    )
+
+    if (
+        first_boundary_gap_ms < 0
+        or final_boundary_gap_ms < 0
+    ):
+        raise _InvalidFutureEvidence(
+            "A future sample falls outside its "
+            "target window."
+        )
+
+    return (
+        first_boundary_gap_ms,
+        final_boundary_gap_ms,
+    )
 
 def _expected_future_sample_count(
     sample_interval_sec: int,
@@ -197,6 +238,21 @@ def _expected_future_sample_count(
         )
 
     return expected_count
+
+def _minimum_future_sample_count(
+    expected_sample_count: int,
+) -> int:
+    """Allow one boundary sample of scheduling jitter."""
+
+    if expected_sample_count <= 0:
+        raise _InvalidFutureEvidence(
+            "The expected sample count must be positive."
+        )
+
+    return max(
+        expected_sample_count - 1,
+        1,
+    )
 
 
 def _maximum_allowed_gap_ms(
@@ -372,6 +428,11 @@ def assign_actual_label(
                     experiment.sample_interval_sec
                 )
             )
+            minimum_sample_count = (
+                _minimum_future_sample_count(
+                    expected_sample_count
+                )
+            )
         except _InvalidFutureEvidence:
             return _finish_without_label(
                 session,
@@ -529,7 +590,7 @@ def assign_actual_label(
 
         if (
             future_sample_count
-            != expected_sample_count
+            < minimum_sample_count
         ):
             return _finish_without_label(
                 session,
@@ -558,8 +619,41 @@ def assign_actual_label(
                 experiment.sample_interval_sec
             )
         )
+        try:
+            (
+                first_boundary_gap_ms,
+                final_boundary_gap_ms,
+            ) = _boundary_sample_gaps_ms(
+                future_samples,
+                target_window_start=(
+                    prediction.target_window_start
+                ),
+                target_window_end=(
+                    prediction.target_window_end
+                ),
+            )
+        except _InvalidFutureEvidence:
+            return _finish_without_label(
+                session,
+                prediction_id=prediction.id,
+                status=(
+                    PredictionLabelStatus
+                    .INVALID_FUTURE_EVIDENCE
+                ),
+                actual_label=None,
+                future_sample_count=(
+                    future_sample_count
+                ),
+                expected_future_sample_count=(
+                    expected_sample_count
+                ),
+            )
 
-        if maximum_sample_gap_ms > allowed_gap_ms:
+        if (
+            maximum_sample_gap_ms > allowed_gap_ms
+            or first_boundary_gap_ms > allowed_gap_ms
+            or final_boundary_gap_ms > allowed_gap_ms
+        ):
             return _finish_without_label(
                 session,
                 prediction_id=prediction.id,
@@ -600,6 +694,9 @@ def assign_actual_label(
             "expected_future_sample_count": (
                 expected_sample_count
             ),
+            "minimum_future_sample_count": (
+                minimum_sample_count
+            ),
             "future_max_blocked_sessions_30s": (
                 maximum_blocked_sessions
             ),
@@ -627,6 +724,15 @@ def assign_actual_label(
             ),
             "maximum_sample_gap_ms": (
                 maximum_sample_gap_ms
+            ),
+            "first_boundary_gap_ms": (
+                first_boundary_gap_ms
+            ),
+            "final_boundary_gap_ms": (
+                final_boundary_gap_ms
+            ),
+            "maximum_allowed_gap_ms": (
+                allowed_gap_ms
             ),
         }
 
