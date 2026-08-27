@@ -413,7 +413,7 @@ def build_phase7_completion_report(
     return {
         "schema_version": "1.0.0",
         "phase": 7,
-        "status": "VERIFIED",
+        "status": "COMPLETED",
         "completion_scope": (
             "model_activation_live_prediction_"
             "integration_and_demonstration"
@@ -438,7 +438,7 @@ def build_phase7_completion_report(
             "39A": "COMPLETED",
             "39B": "COMPLETED",
             "39C": "COMPLETED",
-            "39D": "FINALIZATION_PENDING",
+            "39D": "COMPLETED",
         },
         "documentation": documentation,
         "database": database,
@@ -457,7 +457,7 @@ def build_phase7_completion_report(
                 "COMPLETED"
             ),
             "final_test_and_documentation_review": (
-                "PENDING_39D"
+                "COMPLETED"
             ),
         },
         "limitations": [
@@ -556,7 +556,7 @@ def main() -> int:
         active_model = report["active_model"]
 
         print("Phase 7 verification passed:")
-        print("  Status: VERIFIED")
+        print("  Status: COMPLETED")
         print(
             "  Active model: "
             f"{active_model['name']}"

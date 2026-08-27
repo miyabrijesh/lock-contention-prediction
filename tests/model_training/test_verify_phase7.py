@@ -210,7 +210,7 @@ def test_completion_report_composes_verified_evidence(
     )
 
     assert report["phase"] == 7
-    assert report["status"] == "VERIFIED"
+    assert report["status"] == "COMPLETED"
     assert report["documentation"] == (
         documentation_evidence
     )
@@ -229,7 +229,7 @@ def test_completion_report_composes_verified_evidence(
     )
     assert (
         report["checkpoints"]["39D"]
-        == "FINALIZATION_PENDING"
+        == "COMPLETED"
     )
     assert (
         report["capabilities"][
@@ -252,7 +252,7 @@ def test_completion_report_is_written_as_json(
     report: dict[str, Any] = {
         "schema_version": "1.0.0",
         "phase": 7,
-        "status": "VERIFIED",
+        "status": "COMPLETED",
     }
 
     written_file = write_completion_report(
