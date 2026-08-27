@@ -173,17 +173,81 @@ def _create_prediction(
 ) -> Prediction:
     """Create one prediction linked to a sample."""
 
+    target_window_end = (
+        sample.sampled_at
+        + timedelta(seconds=30)
+    )
+
+    actual_label_assigned_at: (
+        datetime | None
+    ) = None
+
+    actual_label_contract_version: (
+        str | None
+    ) = None
+
+    actual_label_evidence: (
+        dict[str, object] | None
+    ) = None
+
+    if actual_label is not None:
+        actual_label_assigned_at = (
+            target_window_end
+        )
+
+        actual_label_contract_version = (
+            "live-label-v1"
+        )
+
+        maximum_contention_count = (
+            2
+            if actual_label
+            else 0
+        )
+
+        actual_label_evidence = {
+            "future_sample_count": 15,
+            "expected_future_sample_count": 15,
+            (
+                "future_max_"
+                "blocked_sessions_30s"
+            ): maximum_contention_count,
+            (
+                "future_max_"
+                "waiting_locks_30s"
+            ): maximum_contention_count,
+            (
+                "future_deadlock_"
+                "delta_sum_30s"
+            ): 0,
+            (
+                "future_max_"
+                "timeout_rate_30s"
+            ): "0.000000",
+            (
+                "future_max_"
+                "p95_latency_ms_30s"
+            ): "350.000",
+            "first_future_sampled_at": (
+                sample.sampled_at
+                + timedelta(seconds=2)
+            ).isoformat(),
+            "last_future_sampled_at": (
+                target_window_end.isoformat()
+            ),
+            "maximum_sample_gap_ms": 2000,
+        }
+
     prediction = Prediction(
         id=uuid4(),
         experiment_run_id=experiment.id,
         metric_sample_id=sample.id,
         model_version_id=model_version.id,
         predicted_at=sample.sampled_at,
-        target_window_start=sample.sampled_at,
-        target_window_end=(
+        target_window_start=(
             sample.sampled_at
-            + timedelta(seconds=30)
         ),
+        target_window_end=target_window_end,
         probability=Decimal("0.900000"),
         risk_level=RiskLevel.HIGH,
         threshold_used=Decimal("0.340000"),
@@ -194,6 +258,15 @@ def _create_prediction(
             else []
         ),
         actual_label=actual_label,
+        actual_label_assigned_at=(
+            actual_label_assigned_at
+        ),
+        actual_label_contract_version=(
+            actual_label_contract_version
+        ),
+        actual_label_evidence=(
+            actual_label_evidence
+        ),
     )
 
     session.add(prediction)

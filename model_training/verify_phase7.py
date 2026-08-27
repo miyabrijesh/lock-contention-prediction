@@ -42,7 +42,7 @@ DEFAULT_COMPLETION_REPORT: Final[Path] = (
 )
 
 EXPECTED_DATABASE_REVISION: Final[str] = (
-    "a91f6c8d2e47"
+    "b7e4c2d9f801"
 )
 
 REQUIRED_EVIDENCE_FILES: Final[

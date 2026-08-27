@@ -349,6 +349,14 @@ LABEL_INSUFFICIENT_FUTURE_COVERAGE
 This stricter rule does not redefine positive or negative contention. It
 refuses to manufacture a label from unreliable evidence.
 
+## Frozen timestamp-jitter tolerance
+
+Checkpoint 40B freezes the live-label timestamp tolerance as:
+
+```text
+maximum_sample_gap_seconds =
+sample_interval_sec * 1.75
+
 ## Existing training-label limitation
 
 The frozen training dataset used eligibility based on the latest sample

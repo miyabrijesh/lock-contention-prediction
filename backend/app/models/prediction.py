@@ -143,6 +143,47 @@ class Prediction(Base):
             "target_window_end > target_window_start",
             name="ck_predictions_target_window",
         ),
+        CheckConstraint(
+            "actual_label_evidence IS NULL "
+            "OR jsonb_typeof(actual_label_evidence) = "
+            "'object'",
+            name=(
+                "ck_predictions_label_evidence_object"
+            ),
+        ),
+        CheckConstraint(
+            "actual_label_contract_version IS NULL "
+            "OR btrim(actual_label_contract_version) "
+            "<> ''",
+            name=(
+                "ck_predictions_label_contract_nonblank"
+            ),
+        ),
+        CheckConstraint(
+            "actual_label_assigned_at IS NULL "
+            "OR actual_label_assigned_at "
+            ">= target_window_end",
+            name=(
+                "ck_predictions_label_assignment_time"
+            ),
+        ),
+        CheckConstraint(
+            "("
+            "actual_label IS NULL "
+            "AND actual_label_assigned_at IS NULL "
+            "AND actual_label_contract_version IS NULL "
+            "AND actual_label_evidence IS NULL"
+            ") OR ("
+            "actual_label IS NOT NULL "
+            "AND actual_label_assigned_at IS NOT NULL "
+            "AND actual_label_contract_version "
+            "IS NOT NULL "
+            "AND actual_label_evidence IS NOT NULL"
+            ")",
+            name=(
+                "ck_predictions_label_provenance_complete"
+            ),
+        ),
         Index(
             "ix_predictions_experiment_predicted",
             "experiment_run_id",
@@ -152,6 +193,13 @@ class Prediction(Base):
             "ix_predictions_model_predicted",
             "model_version_id",
             "predicted_at",
+        ),
+        Index(
+            "ix_predictions_unlabeled_target_window_end",
+            "target_window_end",
+            postgresql_where=text(
+                "actual_label IS NULL"
+            ),
         ),
     )
 
@@ -218,5 +266,25 @@ class Prediction(Base):
     )
     actual_label: Mapped[bool | None] = mapped_column(
         Boolean,
+        nullable=True,
+    )
+    actual_label_assigned_at: Mapped[
+        datetime | None
+    ] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    actual_label_contract_version: Mapped[
+        str | None
+    ] = mapped_column(
+        String(32),
+        nullable=True,
+    )
+
+    actual_label_evidence: Mapped[
+        dict[str, object] | None
+    ] = mapped_column(
+        JSONB(none_as_null=True),
         nullable=True,
     )

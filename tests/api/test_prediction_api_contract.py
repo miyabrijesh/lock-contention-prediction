@@ -109,6 +109,9 @@ def test_prediction_response_schema_is_complete() -> None:
         "is_stale",
         "quality_flags",
         "actual_label",
+        "actual_label_assigned_at",
+        "actual_label_contract_version",
+        "actual_label_evidence",
     }
 
     assert actual_fields == expected_fields

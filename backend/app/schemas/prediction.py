@@ -30,6 +30,9 @@ class PredictionRead(BaseModel):
     is_stale: bool
     quality_flags: list[str]
     actual_label: bool | None
+    actual_label_assigned_at: datetime | None
+    actual_label_contract_version: str | None
+    actual_label_evidence: dict[str, object] | None
 
 
 class PredictionErrorDetail(BaseModel):
