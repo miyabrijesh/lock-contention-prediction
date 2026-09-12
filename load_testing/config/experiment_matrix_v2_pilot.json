@@ -1,0 +1,44 @@
+{
+    "schema_version": "1.0.0",
+    "matrix_name": "phase_8a_pilot_matrix_v2",
+    "show_id": 2,
+    "duration_sec": 120,
+    "sample_interval_sec": 2,
+    "booking_mode": "EXPERIMENT_RECYCLE",
+    "created_by": "phase-8a-pilot",
+    "traffic_patterns": [
+        "STEADY",
+        "RAMP",
+        "BURST",
+        "FLASH_SALE",
+        "COOLDOWN"
+    ],
+    "demand_profiles": {
+        "LOW": {
+            "hotspot_ratio": "0.20",
+            "hotspot_seat_count": 20
+        },
+        "MEDIUM": {
+            "hotspot_ratio": "0.60",
+            "hotspot_seat_count": 8
+        },
+        "HIGH": {
+            "hotspot_ratio": "0.95",
+            "hotspot_seat_count": 4
+        }
+    },
+    "pressure_levels": {
+        "INTERMEDIATE": {
+            "user_count": 30,
+            "spawn_rate_per_sec": "10.00",
+            "simulated_work_ms": 150
+        }
+    },
+    "random_seeds": [
+        8101
+    ],
+    "expected_run_count": 15,
+    "prediction_horizon_seconds": 30,
+    "estimated_labelled_rows_per_run": 45,
+    "estimated_total_labelled_rows": 675
+}
