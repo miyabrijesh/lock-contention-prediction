@@ -127,7 +127,9 @@ def _load_source_export(
 
     statement = select(DataExport).where(
         DataExport.experiment_run_id
-        == experiment_run_id
+        == experiment_run_id,
+        DataExport.schema_version
+        == SCHEMA_VERSION,
     )
 
     data_export = session.scalar(statement)
@@ -181,7 +183,7 @@ def _validate_header(
     field_names: Sequence[str],
     file_path: Path,
 ) -> None:
-    """Require the exact checkpoint-27 CSV schema."""
+    """Require the exact version-1 CSV schema."""
 
     expected_field_names = list(CSV_FIELD_NAMES)
     actual_field_names = list(field_names)
