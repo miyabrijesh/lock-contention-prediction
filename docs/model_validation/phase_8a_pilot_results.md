@@ -3,10 +3,10 @@
 ## Status
 
 - Campaign: `phase_8a_pilot_matrix_v2`
-- Pilot status: In progress
+- Pilot status: Completed
 - Planned experiments: 15
-- Completed experiments: 5
-- Remaining experiments: 10
+- Completed experiments: 15
+- Remaining experiments: 0
 - Active prediction model: `contention-logistic-v1`
 - Active label contract: `live-label-v2`
 - Verified export schema: `2.0.0`
@@ -133,15 +133,11 @@ necessary.
 
 ## Pilot Decision
 
-The first five runs produced useful class variation and confirmed that
-`live-label-v2` correctly rejects predictions with inadequate sampling
-coverage.
+All fifteen controlled pilot scenarios were completed. The campaign generated enough verified positive and negative examples to expose a significant weakness in the active model.
 
-Standalone version-2 exports have now been generated and verified for all five
-completed experiments. The remaining ten pilot scenarios can proceed before
-any retraining or final model evaluation.
+The active model detects contention reliably but performs poorly when recognizing non-contention conditions. Retraining and threshold evaluation are therefore justified before making a final performance claim.
 
-No production-performance claim is made from these five interim experiments.
+No production-performance claim is made from this controlled pilot campaign.
 
 ## Five-Run Interim Analysis
 
@@ -182,25 +178,82 @@ A separate audit found that the existing version-1 CSV exporter applies a weaker
 
 The existing version-1 exports remain preserved and unchanged for reproducibility. A version-2 export process has now been implemented and verified. It exports only non-stale predictions carrying complete `live-label-v2` provenance and uses the persisted observed label rather than recalculating the target.
 
-## Current Phase 8A Status
+## Final Fifteen-Run Analysis
+
+All fifteen Phase 8A scenarios completed successfully. They covered BURST,
+COOLDOWN, FLASH_SALE, RAMP, and STEADY traffic patterns under LOW, MEDIUM, and
+HIGH demand at the INTERMEDIATE pressure level.
+
+The verified dataset contains:
+
+- completed experiments: 15;
+- metric samples and predictions: 900;
+- verified `live-label-v2` rows: 662;
+- excluded unlabelled tail predictions: 238;
+- positive labels: 545;
+- negative labels: 117.
+
+The final confusion matrix for `contention-logistic-v1` is:
+
+| Outcome | Count |
+|---|---:|
+| True negative | 7 |
+| False positive | 110 |
+| False negative | 1 |
+| True positive | 544 |
+
+The corresponding metrics are:
+
+| Metric | Value |
+|---|---:|
+| Accuracy | 83.23% |
+| Precision | 83.18% |
+| Recall | 99.82% |
+| F1-score | 90.74% |
+| Specificity | 5.98% |
+| Balanced accuracy | 52.90% |
+
+Accuracy and F1-score are inflated by the positive-heavy label distribution.
+The model correctly detected 544 of 545 positive cases but correctly identified
+only 7 of 117 negative cases. It produced false warnings for 110 negative
+cases.
+
+All HIGH-demand scenarios contained only positive labels. Negative examples
+were concentrated in LOW-demand scenarios, with five additional negative rows
+from MEDIUM-COOLDOWN. This indicates that retraining should emphasize LOW and
+borderline MEDIUM conditions rather than adding more obvious high-contention
+examples.
+
+## Verified Export Evidence
+
+All fifteen version-2 CSV files were checked against their `data_exports`
+database registrations:
+
+- every registered schema version was `2.0.0`;
+- every file SHA-256 matched its database record;
+- every registered row count matched its CSV;
+- every exported label used `live-label-v2`;
+- every accepted prediction was non-stale;
+- model probability, risk level, and threshold were excluded from the feature
+  schema to prevent model-output leakage.
+
+Existing version-1 exports and all Phase 7.5 artifacts remain unchanged.
+
+## Final Phase 8A Status
 
 - Planned pilot scenarios: 15
-- Completed scenarios: 5
-- Remaining scenarios: 10
-- Current status: Partially completed
-- Dataset version 2: Generated and verified for five completed experiments
-- Verified version-2 rows: 220
-- Negative labels: 35
-- Positive labels: 185
-- Model retraining: Not yet performed
+- Completed scenarios: 15
+- Remaining scenarios: 0
+- Verified version-2 rows: 662
+- Negative labels: 117
+- Positive labels: 545
+- Verified export audit: Passed
+- Model retraining: Required but not yet performed
 - Production deployment: Not started
 
-All five version-2 CSV files were checked against their registered database
-records. Their row counts and SHA-256 hashes matched, and every accepted row
-used the `live-label-v2` contract.
+Phase 8A data collection and verified export are complete. The next step is to
+construct a combined immutable version-2 dataset, create experiment-grouped
+training and validation splits, retrain candidate models, and compare them
+against the active model.
 
-The dataset remains strongly weighted toward positive labels. The remaining
-ten experiments are still needed before retraining decisions or final model
-evaluation.
-
-No production-performance claim is made from these five interim experiments.
+No production-performance claim is made from this controlled pilot dataset.
