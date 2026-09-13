@@ -302,16 +302,19 @@ def _load_metric_samples(
 def _existing_export(
     session: Session,
     experiment_run_id: UUID,
+    *,
+    schema_version: str = SCHEMA_VERSION,
 ) -> DataExport | None:
-    """Find an existing registered experiment export."""
+    """Find an existing export of the requested schema version."""
 
     statement = select(DataExport).where(
         DataExport.experiment_run_id
-        == experiment_run_id
+        == experiment_run_id,
+        DataExport.schema_version
+        == schema_version,
     )
 
     return session.scalar(statement)
-
 
 def _calculate_label_evidence(
     future_samples: list[MetricSample],

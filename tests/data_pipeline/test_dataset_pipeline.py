@@ -4,8 +4,10 @@ from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
+from sqlalchemy.orm import Session
 
 from backend.app.models import (
+    DataExport,
     ExperimentRun,
     MetricSample,
 )
@@ -20,6 +22,7 @@ from data_pipeline.combine_exports import (
 from data_pipeline.export_experiment import (
     CSV_FIELD_NAMES,
     ExperimentExportError,
+    _existing_export,
     build_labelled_rows,
 )
 from load_testing.run_synchronized_experiment import (
@@ -452,3 +455,63 @@ def test_extract_api_error_reads_structured_detail() -> None:
 
     assert "EXPERIMENT_NOT_FOUND" in message
     assert "The experiment was not found." in message
+
+def test_existing_export_is_scoped_to_schema_version(
+    db_session: Session,
+) -> None:
+    """Allow one registered export for each schema version."""
+    base_time = datetime(
+        2026,
+        9,
+        13,
+        12,
+        0,
+        tzinfo=UTC,
+    )
+
+    experiment = create_completed_experiment(
+        started_at=base_time,
+        ended_at=base_time + timedelta(seconds=120),
+    )
+
+    db_session.add(experiment)
+    db_session.flush()
+
+    version_1_export = DataExport(
+        experiment_run_id=experiment.id,
+        file_path="/tmp/version-1.csv",
+        file_sha256="a" * 64,
+        schema_version="1.0.0",
+        row_count=44,
+        created_by="pytest",
+    )
+    version_2_export = DataExport(
+        experiment_run_id=experiment.id,
+        file_path="/tmp/version-2.csv",
+        file_sha256="b" * 64,
+        schema_version="2.0.0",
+        row_count=43,
+        created_by="pytest",
+    )
+
+    db_session.add_all([
+        version_1_export,
+        version_2_export,
+    ])
+    db_session.flush()
+
+    observed_v1 = _existing_export(
+        db_session,
+        experiment.id,
+    )
+    observed_v2 = _existing_export(
+        db_session,
+        experiment.id,
+        schema_version="2.0.0",
+    )
+
+    assert observed_v1 is not None
+    assert observed_v1.id == version_1_export.id
+
+    assert observed_v2 is not None
+    assert observed_v2.id == version_2_export.id
