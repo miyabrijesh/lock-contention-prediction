@@ -9,6 +9,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     String,
+    UniqueConstraint,
     func,
     text,
 )
@@ -89,6 +90,11 @@ class DataExport(Base):
             "file_sha256 ~ '^[0-9a-fA-F]{64}$'",
             name="ck_data_exports_file_sha256",
         ),
+        UniqueConstraint(
+            "experiment_run_id",
+            "schema_version",
+            name="uq_data_exports_run_schema_version",
+        ),
         Index(
             "ix_data_exports_created_at",
             "created_at",
@@ -104,7 +110,6 @@ class DataExport(Base):
         PostgresUUID(as_uuid=True),
         ForeignKey("experiment_runs.id", ondelete="RESTRICT"),
         nullable=False,
-        unique=True,
     )
     file_path: Mapped[str] = mapped_column(
         String(500),

@@ -29,6 +29,9 @@ from monitoring.prediction_coverage import (
     build_prediction_coverage_report,
 )
 
+from alembic.config import Config
+from alembic.script import ScriptDirectory
+from alembic.script.revision import ResolutionError
 
 PROJECT_ROOT: Final[Path] = (
     Path(__file__).resolve().parents[1]
@@ -197,9 +200,8 @@ def verify_documentation_evidence() -> dict[str, Any]:
 
 def verify_database_revision(
     session: Session,
-) -> dict[str, Any]:
-    """Verify the expected Phase 7 database revision."""
-
+) -> dict[str, object]:
+    """Verify that the current schema contains Phase 7."""
     revision = session.scalar(
         text(
             "SELECT version_num "
@@ -207,21 +209,81 @@ def verify_database_revision(
         )
     )
 
-    if revision != EXPECTED_DATABASE_REVISION:
+    if not isinstance(revision, str):
         raise Phase7VerificationError(
-            "Database revision is unexpected: "
-            f"{revision!r}."
+            "The current database revision could not be read."
+        )
+
+    configuration = Config(
+        str(PROJECT_ROOT / "alembic.ini")
+    )
+    migration_scripts = ScriptDirectory.from_config(
+        configuration
+    )
+    migration_head = migration_scripts.get_current_head()
+
+    if migration_head is None:
+        raise Phase7VerificationError(
+            "The Alembic migration head could not be determined."
+        )
+
+    try:
+        current_script = migration_scripts.get_revision(
+            revision
+        )
+        baseline_script = migration_scripts.get_revision(
+            EXPECTED_DATABASE_REVISION
+        )
+    except ResolutionError as error:
+        raise Phase7VerificationError(
+            "The database contains an unknown migration revision."
+        ) from error
+
+    if current_script is None:
+        raise Phase7VerificationError(
+            f"Database revision {revision} was not found."
+        )
+
+    if baseline_script is None:
+        raise Phase7VerificationError(
+            "The Phase 7 baseline migration was not found."
+        )
+
+    lineage = {
+        script.revision
+        for script in migration_scripts.iterate_revisions(
+            revision,
+            "base",
+        )
+    }
+
+    phase7_baseline_present = (
+        EXPECTED_DATABASE_REVISION in lineage
+    )
+    is_current = revision == migration_head
+
+    if not phase7_baseline_present:
+        raise Phase7VerificationError(
+            "The current database revision does not descend "
+            "from the Phase 7 baseline."
+        )
+
+    if not is_current:
+        raise Phase7VerificationError(
+            f"Database revision {revision} is behind the "
+            f"migration head {migration_head}."
         )
 
     return {
         "revision": revision,
-        "expected_revision": (
+        "migration_head": migration_head,
+        "phase7_baseline_revision": (
             EXPECTED_DATABASE_REVISION
         ),
+        "phase7_baseline_present": True,
         "is_current": True,
         "phase7_migration_required": False,
     }
-
 
 def verify_active_model(
     session: Session,

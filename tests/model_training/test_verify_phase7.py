@@ -79,9 +79,11 @@ def test_database_revision_is_current(
         db_session
     )
 
-    assert evidence["revision"] == (
+    assert evidence["revision"] == evidence["migration_head"]
+    assert evidence["phase7_baseline_revision"] == (
         EXPECTED_DATABASE_REVISION
     )
+    assert evidence["phase7_baseline_present"] is True
     assert evidence["is_current"] is True
     assert (
         evidence["phase7_migration_required"]
