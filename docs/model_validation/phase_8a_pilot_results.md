@@ -133,14 +133,15 @@ necessary.
 
 ## Pilot Decision
 
-The first run provides useful class variation, but it contains one isolated
-coverage failure during startup.
+The first five runs produced useful class variation and confirmed that
+`live-label-v2` correctly rejects predictions with inadequate sampling
+coverage.
 
-The next action is to execute one additional scenario and determine whether
-the startup-gap failure repeats. The remaining pilot matrix will be resumed
-only after the second scenario is inspected.
+Standalone version-2 exports have now been generated and verified for all five
+completed experiments. The remaining ten pilot scenarios can proceed before
+any retraining or final model evaluation.
 
-No production-performance claim is made from this single run.
+No production-performance claim is made from these five interim experiments.
 
 ## Five-Run Interim Analysis
 
