@@ -1,5 +1,3 @@
-from backend.app.api.routes import predictions
-from backend.app.api.routes import predictions
 import argparse
 import csv
 import hashlib
