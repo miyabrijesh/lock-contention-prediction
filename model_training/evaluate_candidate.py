@@ -13,6 +13,8 @@ from model_training.train_baselines import (
     evaluate_probabilities,
 )
 from model_training.training_data import (
+    DEFAULT_MANIFEST_FILE,
+    DEFAULT_SPLIT_DIRECTORY,
     TrainingDataBundle,
     TrainingDataError,
     load_training_data,
@@ -616,6 +618,8 @@ def run_final_evaluation(
         DEFAULT_SELECTION_REPORT
     ),
     output_file: Path = DEFAULT_FINAL_REPORT,
+    split_directory: Path = DEFAULT_SPLIT_DIRECTORY,
+    manifest_file: Path = DEFAULT_MANIFEST_FILE,
 ) -> dict[str, Any]:
     """Run and save the one-time final evaluation."""
 
@@ -626,7 +630,10 @@ def run_final_evaluation(
             f"{output_file}"
         )
 
-    data = load_training_data()
+    data = load_training_data(
+        split_directory=split_directory,
+        manifest_file=manifest_file,
+    )
 
     (
         artifact,
@@ -686,6 +693,23 @@ def parse_arguments() -> argparse.Namespace:
         default=DEFAULT_FINAL_REPORT,
     )
 
+    parser.add_argument(
+        "--split-directory",
+        type=Path,
+        default=DEFAULT_SPLIT_DIRECTORY,
+        help=(
+            "Directory containing train.csv, "
+            "validation.csv, and test.csv."
+        ),
+    )
+
+    parser.add_argument(
+        "--manifest-file",
+        type=Path,
+        default=DEFAULT_MANIFEST_FILE,
+        help="Frozen split manifest JSON file.",
+    )
+
     return parser.parse_args()
 
 
@@ -701,6 +725,10 @@ def main() -> int:
                 arguments.selection_report
             ),
             output_file=arguments.output_file,
+            split_directory=(
+                arguments.split_directory
+            ),
+            manifest_file=arguments.manifest_file,
         )
 
         metrics = report["test_metrics"]

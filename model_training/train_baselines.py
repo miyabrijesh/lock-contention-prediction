@@ -24,6 +24,8 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
 from model_training.training_data import (
+    DEFAULT_MANIFEST_FILE,
+    DEFAULT_SPLIT_DIRECTORY,
     TrainingDataBundle,
     TrainingDataError,
     load_training_data,
@@ -509,6 +511,23 @@ def parse_arguments() -> argparse.Namespace:
         ),
     )
 
+    parser.add_argument(
+        "--split-directory",
+        type=Path,
+        default=DEFAULT_SPLIT_DIRECTORY,
+        help=(
+            "Directory containing train.csv, "
+            "validation.csv, and test.csv."
+        ),
+    )
+
+    parser.add_argument(
+        "--manifest-file",
+        type=Path,
+        default=DEFAULT_MANIFEST_FILE,
+        help="Frozen split manifest JSON file.",
+    )
+
     return parser.parse_args()
 
 
@@ -549,7 +568,12 @@ def main() -> int:
     arguments = parse_arguments()
 
     try:
-        data = load_training_data()
+        data = load_training_data(
+            split_directory=(
+                arguments.split_directory
+            ),
+            manifest_file=arguments.manifest_file,
+        )
 
         report = train_baseline_models(data)
 

@@ -20,11 +20,12 @@ from model_training.train_baselines import (
     build_baseline_models,
 )
 from model_training.training_data import (
+    DEFAULT_MANIFEST_FILE,
+    DEFAULT_SPLIT_DIRECTORY,
     TrainingDataBundle,
     TrainingDataError,
     load_training_data,
 )
-
 
 PROJECT_ROOT: Final[Path] = (
     Path(__file__).resolve().parents[1]
@@ -749,6 +750,23 @@ def parse_arguments() -> argparse.Namespace:
         default=DEFAULT_SELECTION_REPORT,
     )
 
+    parser.add_argument(
+        "--split-directory",
+        type=Path,
+        default=DEFAULT_SPLIT_DIRECTORY,
+        help=(
+            "Directory containing train.csv, "
+            "validation.csv, and test.csv."
+        ),
+    )
+
+    parser.add_argument(
+        "--manifest-file",
+        type=Path,
+        default=DEFAULT_MANIFEST_FILE,
+        help="Frozen split manifest JSON file.",
+    )
+
     return parser.parse_args()
 
 
@@ -758,7 +776,12 @@ def main() -> int:
     arguments = parse_arguments()
 
     try:
-        data = load_training_data()
+        data = load_training_data(
+            split_directory=(
+                arguments.split_directory
+            ),
+            manifest_file=arguments.manifest_file,
+        )
 
         baseline_report = load_baseline_report(
             arguments.baseline_report
