@@ -47,7 +47,6 @@ DEFAULT_FINAL_REPORT: Final[Path] = (
 )
 
 FINAL_REPORT_SCHEMA_VERSION: Final[str] = "1.0.0"
-EXPECTED_MODEL_NAME: Final[str] = "logistic_regression"
 F_BETA: Final[float] = 2.0
 
 
@@ -160,12 +159,16 @@ def load_frozen_candidate(
             "Candidate selection metadata is invalid."
         )
 
+    selected_model_name = selection.get(
+        "model_name"
+    )
+
     if (
-        selection.get("model_name")
-        != EXPECTED_MODEL_NAME
+        not isinstance(selected_model_name, str)
+        or not selected_model_name
     ):
         raise FinalEvaluationError(
-            "The selected model name is unexpected."
+            "The selected model name is invalid."
         )
 
     test_metadata = selection_report.get("test")
@@ -223,10 +226,11 @@ def load_frozen_candidate(
 
     if (
         artifact.get("model_name")
-        != EXPECTED_MODEL_NAME
+        != selected_model_name
     ):
         raise FinalEvaluationError(
-            "Candidate artifact contains the wrong model."
+            "Candidate artifact model does not match "
+            "the selection report."
         )
 
     model = artifact.get("model")
