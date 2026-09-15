@@ -1,10 +1,16 @@
 import argparse
+import re
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID
 
+from sqlalchemy import select
+
 from backend.app.core.config import settings
+from backend.app.db.session import SessionLocal
+from backend.app.models import Seat
+from backend.app.models.enums import SeatState
 from load_testing.run_synchronized_experiment import (
     SynchronizedRunnerError,
     _api_request,
@@ -41,6 +47,22 @@ def _positive_integer(value: str) -> int:
     return parsed_value
 
 
+def _seat_number(value: str) -> str:
+    """Parse and normalize one auditorium seat number."""
+
+    normalized_value = value.strip().upper()
+
+    if not re.fullmatch(
+        r"[A-Z]+[1-9][0-9]*",
+        normalized_value,
+    ):
+        raise argparse.ArgumentTypeError(
+            "Seat number must look like A1, C8 or D9."
+        )
+
+    return normalized_value
+
+
 def _duration_seconds(value: str) -> int:
     """Parse a supported experiment duration."""
 
@@ -72,9 +94,40 @@ def _simulated_work_ms(value: str) -> int:
     return parsed_value
 
 
+def resolve_seat_id(
+    *,
+    show_id: int,
+    seat_number: str,
+) -> int:
+    """Resolve an available seat number to its database ID."""
+
+    with SessionLocal() as session:
+        statement = select(Seat).where(
+            Seat.show_id == show_id,
+            Seat.seat_number == seat_number,
+        )
+
+        seat = session.scalar(statement)
+
+        if seat is None:
+            raise InteractiveDemoError(
+                f"Seat {seat_number} was not found "
+                f"for show {show_id}."
+            )
+
+        if seat.state != SeatState.AVAILABLE:
+            raise InteractiveDemoError(
+                f"Seat {seat_number} is currently "
+                f"{seat.state.value}."
+            )
+
+        return seat.id
+
+
 def create_interactive_experiment(
     *,
     seat_id: int,
+    seat_number: str,
     show_id: int,
     user_count: int,
     duration_sec: int,
@@ -94,7 +147,7 @@ def create_interactive_experiment(
         payload={
             "name": (
                 "Interactive seat contention demo "
-                f"{timestamp}"
+                f"{seat_number} {timestamp}"
             ),
             "show_id": show_id,
             "user_count": user_count,
@@ -108,7 +161,7 @@ def create_interactive_experiment(
             "simulated_work_ms": simulated_work_ms,
             "booking_mode": "EXPERIMENT_RECYCLE",
             "random_seed": 9200 + seat_id,
-            "code_version": "interactive-demo-v2",
+            "code_version": "interactive-demo-v3",
             "created_by": "interactive-demo-runner",
         },
     )
@@ -161,12 +214,12 @@ def parse_arguments() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "--seat-id",
-        type=_positive_integer,
+        "--seat-number",
+        type=_seat_number,
         required=True,
         help=(
-            "Database ID of the experiment-show seat "
-            "selected by the customer."
+            "Experiment-show seat selected by the customer, "
+            "for example D9."
         ),
     )
 
@@ -248,8 +301,14 @@ def main() -> int:
         return 2
 
     try:
+        seat_id = resolve_seat_id(
+            show_id=arguments.show_id,
+            seat_number=arguments.seat_number,
+        )
+
         experiment_id = create_interactive_experiment(
-            seat_id=arguments.seat_id,
+            seat_id=seat_id,
+            seat_number=arguments.seat_number,
             show_id=arguments.show_id,
             user_count=arguments.users,
             duration_sec=arguments.duration,
@@ -262,7 +321,11 @@ def main() -> int:
         print("Interactive demo experiment created:")
         print(f"  Experiment: {experiment_id}")
         print(f"  Show: {arguments.show_id}")
-        print(f"  Contested seat ID: {arguments.seat_id}")
+        print(
+            "  Contested seat: "
+            f"{arguments.seat_number} "
+            f"(database ID {seat_id})"
+        )
         print(f"  Locust users: {arguments.users}")
         print(
             "  Simulated lock work: "
