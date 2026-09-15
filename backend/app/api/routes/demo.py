@@ -6,6 +6,7 @@ from fastapi import (
     Depends,
     Header,
     HTTPException,
+    Query,
     Response,
     status,
 )
@@ -25,6 +26,7 @@ from backend.app.schemas.booking import (
     BookingRead,
 )
 from backend.app.schemas.demo import (
+    DemoActiveExperimentRead,
     DemoContentionStatusRead,
 )
 from backend.app.services.booking_service import (
@@ -94,6 +96,7 @@ def create_demo_booking(
                 ),
             },
         )
+
     active_experiment_statement = (
         select(ExperimentRun)
         .where(
@@ -125,8 +128,8 @@ def create_demo_booking(
         ),
         persist_experiment_booking=(
             active_experiment is not None
-    ),
-)
+        ),
+    )
 
     try:
         result = create_booking(
@@ -152,6 +155,66 @@ def create_demo_booking(
 
     return BookingRead.model_validate(
         result.booking
+    )
+
+
+@router.get(
+    "/active-experiment",
+    response_model=DemoActiveExperimentRead,
+    summary="Read the currently running demo experiment",
+)
+def get_active_demo_experiment(
+    session: DatabaseSession,
+    show_id: Annotated[
+        int,
+        Query(
+            ge=1,
+            description=(
+                "Show whose running experiment "
+                "should be returned."
+            ),
+        ),
+    ],
+) -> DemoActiveExperimentRead:
+    """Return the latest running experiment for one show."""
+
+    statement = (
+        select(ExperimentRun)
+        .where(
+            ExperimentRun.show_id == show_id,
+            ExperimentRun.status
+            == ExperimentStatus.RUNNING,
+        )
+        .order_by(
+            ExperimentRun.started_at.desc(),
+            ExperimentRun.id.desc(),
+        )
+        .limit(1)
+    )
+
+    active_experiment = session.scalar(statement)
+
+    if active_experiment is None:
+        return DemoActiveExperimentRead(
+            active=False,
+            experiment_run_id=None,
+            show_id=None,
+            status=None,
+            hotspot_seat_ids=[],
+            started_at=None,
+            duration_sec=None,
+        )
+
+    return DemoActiveExperimentRead(
+        active=True,
+        experiment_run_id=active_experiment.id,
+        show_id=active_experiment.show_id,
+        status=active_experiment.status,
+        hotspot_seat_ids=list(
+            active_experiment.hotspot_seat_ids
+        ),
+        started_at=active_experiment.started_at,
+        duration_sec=active_experiment.duration_sec,
     )
 
 

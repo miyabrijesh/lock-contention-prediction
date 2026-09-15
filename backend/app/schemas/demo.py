@@ -7,7 +7,10 @@ from pydantic import (
 )
 from pydantic.alias_generators import to_camel
 
-from backend.app.models.enums import RiskLevel
+from backend.app.models.enums import (
+    ExperimentStatus,
+    RiskLevel,
+)
 
 
 class DemoContentionStatusRead(BaseModel):
@@ -30,3 +33,20 @@ class DemoContentionStatusRead(BaseModel):
     waiting_locks: int | None
     requests_per_second: float | None
     p95_latency_ms: float | None
+
+
+class DemoActiveExperimentRead(BaseModel):
+    """Public state of the currently running demo experiment."""
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+    active: bool
+    experiment_run_id: UUID | None
+    show_id: int | None
+    status: ExperimentStatus | None
+    hotspot_seat_ids: list[int]
+    started_at: datetime | None
+    duration_sec: int | None

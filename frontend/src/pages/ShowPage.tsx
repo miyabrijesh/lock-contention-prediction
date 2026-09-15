@@ -14,6 +14,7 @@ import {
 import {
     ApiClientError,
     createDemoBooking,
+    getActiveExperiment,
     getShow,
     listSeats,
 } from '../lib/api'
@@ -22,6 +23,7 @@ import {
     saveBookingConfirmation,
 } from '../lib/demoSession'
 import type {
+    ActiveExperiment,
     RequestState,
     Seat,
     Show,
@@ -70,6 +72,9 @@ export function ShowPage() {
     )
     const [errorMessage, setErrorMessage] = (
         useState<string | null>(null)
+    )
+    const [activeExperiment, setActiveExperiment] = (
+        useState<ActiveExperiment | null>(null)
     )
 
     const loadScreening = useCallback(async (): Promise<void> => {
@@ -134,6 +139,47 @@ export function ShowPage() {
         }
     }, [loadScreening])
 
+    useEffect(() => {
+        if (
+            !Number.isInteger(numericShowId)
+            || numericShowId < 1
+        ) {
+            return
+        }
+
+        let mounted = true
+
+        async function loadExperiment(): Promise<void> {
+            try {
+                const result = await getActiveExperiment(
+                    numericShowId,
+                )
+
+                if (mounted) {
+                    setActiveExperiment(result)
+                }
+            } catch {
+                if (mounted) {
+                    setActiveExperiment(null)
+                }
+            }
+        }
+
+        const initialTimer = window.setTimeout(() => {
+            void loadExperiment()
+        }, 0)
+
+        const intervalId = window.setInterval(() => {
+            void loadExperiment()
+        }, 2000)
+
+        return () => {
+            mounted = false
+            window.clearTimeout(initialTimer)
+            window.clearInterval(intervalId)
+        }
+    }, [numericShowId])
+
     const seatsByRow = useMemo(() => {
         const grouped = new Map<string, Seat[]>()
 
@@ -144,6 +190,7 @@ export function ShowPage() {
             rowSeats.push(seat)
             grouped.set(row, rowSeats)
         }
+
         for (const rowSeats of grouped.values()) {
             rowSeats.sort((leftSeat, rightSeat) => (
                 leftSeat.seat_number.localeCompare(
@@ -157,12 +204,45 @@ export function ShowPage() {
         }
 
         return Array.from(grouped.entries())
-
     }, [seats])
 
     const selectedSeat = seats.find(
         (seat) => seat.id === selectedSeatId,
     ) ?? null
+
+    const contestedSeatIds = useMemo(
+        () => new Set(
+            activeExperiment?.hotspotSeatIds ?? [],
+        ),
+        [activeExperiment],
+    )
+
+    const contestedSeatNumbers = useMemo(
+        () => (
+            seats
+                .filter((seat) => (
+                    contestedSeatIds.has(seat.id)
+                ))
+                .map((seat) => seat.seat_number)
+        ),
+        [
+            contestedSeatIds,
+            seats,
+        ],
+    )
+
+    const selectedSeatIsContested = (
+        selectedSeat !== null
+        && contestedSeatIds.has(selectedSeat.id)
+    )
+
+    const experimentBookingReady = (
+        !show?.is_experiment_show
+        || (
+            activeExperiment?.active === true
+            && selectedSeatIsContested
+        )
+    )
 
     function selectSeat(seat: Seat): void {
         if (
@@ -186,6 +266,27 @@ export function ShowPage() {
                 'Select one available seat to continue.',
             )
             return
+        }
+
+        if (show.is_experiment_show) {
+            if (!activeExperiment?.active) {
+                setErrorMessage(
+                    'No contention experiment is currently '
+                    + 'running. Start the interactive runner '
+                    + 'before booking.',
+                )
+                return
+            }
+
+            if (!contestedSeatIds.has(selectedSeat.id)) {
+                setErrorMessage(
+                    'Select the seat targeted by the live '
+                    + `experiment: ${contestedSeatNumbers.join(', ')
+                    || 'the highlighted seat'
+                    }.`,
+                )
+                return
+            }
         }
 
         const user = getDemoUser()
@@ -301,12 +402,15 @@ export function ShowPage() {
                     >
                         Films
                     </Link>
+
                     <p className="eyebrow">
                         Select one seat
                     </p>
+
                     <h1>
                         The Last Signal
                     </h1>
+
                     <p>
                         {formatScreeningTime(show.show_time)}
                         <br />
@@ -346,14 +450,28 @@ export function ShowPage() {
                             <i className="seat-swatch seat-swatch--available" />
                             Available
                         </span>
+
                         <span>
                             <i className="seat-swatch seat-swatch--selected" />
                             Selected
                         </span>
+
                         <span>
                             <i className="seat-swatch seat-swatch--booked" />
                             Booked
                         </span>
+
+                        {activeExperiment?.active ? (
+                            <span>
+                                <i
+                                    className={
+                                        'seat-swatch '
+                                        + 'seat-swatch--selected'
+                                    }
+                                />
+                                Live contested seat
+                            </span>
+                        ) : null}
                     </div>
 
                     <div className="seat-map">
@@ -374,11 +492,19 @@ export function ShowPage() {
                                         const selected = (
                                             seat.id === selectedSeatId
                                         )
+                                        const contested = (
+                                            contestedSeatIds.has(
+                                                seat.id,
+                                            )
+                                        )
 
                                         const className = [
                                             'seat-button',
                                             selected
                                                 ? 'seat-button--selected'
+                                                : '',
+                                            contested
+                                                ? 'seat-button--contested'
                                                 : '',
                                             seat.state !== 'AVAILABLE'
                                                 ? 'seat-button--unavailable'
@@ -387,20 +513,46 @@ export function ShowPage() {
                                             .filter(Boolean)
                                             .join(' ')
 
+                                        const seatDescription = (
+                                            selected
+                                                ? 'selected'
+                                                : seat.state.toLowerCase()
+                                        )
+
                                         return (
                                             <button
                                                 className={className}
                                                 type="button"
                                                 key={seat.id}
                                                 disabled={
-                                                    seat.state !== 'AVAILABLE'
+                                                    seat.state
+                                                    !== 'AVAILABLE'
                                                 }
                                                 aria-pressed={selected}
                                                 aria-label={
-                                                    `${seat.seat_number}: ${selected
-                                                        ? 'selected'
-                                                        : seat.state.toLowerCase()
+                                                    `${seat.seat_number}: ${seatDescription
+                                                    }${contested
+                                                        ? ', live contested seat'
+                                                        : ''
                                                     }`
+                                                }
+                                                style={
+                                                    contested
+                                                        && !selected
+                                                        ? {
+                                                            outline: (
+                                                                '3px solid '
+                                                                + '#a22028'
+                                                            ),
+                                                            outlineOffset: (
+                                                                '3px'
+                                                            ),
+                                                            boxShadow: (
+                                                                '0 0 0 2px '
+                                                                + '#f3eee4'
+                                                            ),
+                                                        }
+                                                        : undefined
                                                 }
                                                 onClick={() => {
                                                     selectSeat(seat)
@@ -427,6 +579,7 @@ export function ShowPage() {
                     <p className="eyebrow">
                         Your booking
                     </p>
+
                     <h2>
                         {selectedSeat
                             ? `Seat ${selectedSeat.seat_number}`
@@ -438,21 +591,51 @@ export function ShowPage() {
                             <dt>Film</dt>
                             <dd>The Last Signal</dd>
                         </div>
+
                         <div>
                             <dt>Venue</dt>
                             <dd>{show.venue}</dd>
                         </div>
+
                         <div>
                             <dt>Ticket</dt>
                             <dd>
                                 {selectedSeat ? '₹240' : '—'}
                             </dd>
                         </div>
+
                         <div>
                             <dt>Booking fee</dt>
                             <dd>₹0</dd>
                         </div>
                     </dl>
+
+                    {show.is_experiment_show ? (
+                        <p
+                            className="booking-summary__notice"
+                            aria-live="polite"
+                        >
+                            {activeExperiment?.active
+                                ? (
+                                    'Live contention experiment '
+                                    + 'running. Contested seat: '
+                                    + (
+                                        contestedSeatNumbers.join(
+                                            ', ',
+                                        )
+                                        || 'loading'
+                                    )
+                                    + '.'
+                                )
+                                : (
+                                    'Waiting for a live contention '
+                                    + 'experiment. Select the seat '
+                                    + 'specified in the runner, then '
+                                    + 'confirm when the experiment '
+                                    + 'becomes active.'
+                                )}
+                        </p>
+                    ) : null}
 
                     <p className="booking-summary__notice">
                         Demonstration booking only. No payment
@@ -474,6 +657,7 @@ export function ShowPage() {
                         disabled={
                             !selectedSeat
                             || bookingState === 'loading'
+                            || !experimentBookingReady
                         }
                         onClick={() => {
                             void completeBooking()
@@ -481,7 +665,12 @@ export function ShowPage() {
                     >
                         {bookingState === 'loading'
                             ? 'Reserving seat'
-                            : 'Confirm booking'}
+                            : (
+                                show.is_experiment_show
+                                    && !activeExperiment?.active
+                                    ? 'Waiting for experiment'
+                                    : 'Confirm booking'
+                            )}
                     </button>
                 </aside>
             </div>

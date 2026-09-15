@@ -95,6 +95,15 @@ export interface ContentionStatus {
     requestsPerSecond: number | null
     p95LatencyMs: number | null
 }
+export interface ActiveExperiment {
+    active: boolean
+    experimentRunId: string | null
+    showId: number | null
+    status: 'RUNNING' | null
+    hotspotSeatIds: number[]
+    startedAt: string | null
+    durationSec: number | null
+}
 
 export interface ApiErrorDetail {
     code?: string

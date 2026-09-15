@@ -1,4 +1,5 @@
 import type {
+    ActiveExperiment,
     ApiErrorBody,
     Booking,
     ContentionStatus,
@@ -150,6 +151,18 @@ export async function createDemoBookings(
     }
 
     return bookings
+}
+
+export function getActiveExperiment(
+    showId: number,
+): Promise<ActiveExperiment> {
+    const query = new URLSearchParams({
+        show_id: String(showId),
+    })
+
+    return request<ActiveExperiment>(
+        `/api/v1/demo/active-experiment?${query}`,
+    )
 }
 
 export function getContentionStatus():
