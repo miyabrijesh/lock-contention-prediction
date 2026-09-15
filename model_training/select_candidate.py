@@ -449,6 +449,9 @@ def build_candidate(
     *,
     data: TrainingDataBundle,
     baseline_report: dict[str, Any],
+    baseline_report_file: Path = (
+        DEFAULT_BASELINE_REPORT
+    ),
 ) -> tuple[Any, dict[str, Any]]:
     """Fit and select the candidate without evaluating test data."""
 
@@ -616,7 +619,7 @@ def build_candidate(
             ),
             "baseline_report_sha256": (
                 _sha256(
-                    DEFAULT_BASELINE_REPORT
+                    baseline_report_file
                 )
             ),
         },
@@ -790,6 +793,9 @@ def main() -> int:
         model, report = build_candidate(
             data=data,
             baseline_report=baseline_report,
+            baseline_report_file=(
+                arguments.baseline_report
+            ),
         )
 
         model_file, report_file = (
