@@ -1,9 +1,12 @@
 import argparse
 import json
+import os
+import signal
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
-from time import sleep
+from time import monotonic, sleep
 from typing import cast
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -239,7 +242,7 @@ def _terminate_process(
     *,
     process_name: str,
 ) -> None:
-    """Terminate one child process if it is still running."""
+    """Terminate one child process and its subprocess group."""
 
     if process is None or process.poll() is not None:
         return
@@ -248,7 +251,29 @@ def _terminate_process(
         f"Stopping {process_name} process..."
     )
 
-    process.terminate()
+    process_group_id: int | None = None
+
+    if os.name == "posix":
+        try:
+            candidate_group_id = os.getpgid(
+                process.pid
+            )
+
+            if candidate_group_id == process.pid:
+                process_group_id = candidate_group_id
+        except ProcessLookupError:
+            process_group_id = None
+
+    try:
+        if process_group_id is not None:
+            os.killpg(
+                process_group_id,
+                signal.SIGTERM,
+            )
+        else:
+            process.terminate()
+    except ProcessLookupError:
+        pass
 
     try:
         process.wait(timeout=5)
@@ -258,7 +283,18 @@ def _terminate_process(
             "forcing termination.",
             file=sys.stderr,
         )
-        process.kill()
+
+        try:
+            if process_group_id is not None:
+                os.killpg(
+                    process_group_id,
+                    signal.SIGKILL,
+                )
+            else:
+                process.kill()
+        except ProcessLookupError:
+            pass
+
         process.wait(timeout=5)
 
 
@@ -266,16 +302,33 @@ def _wait_for_processes(
     *,
     workload_process: subprocess.Popen[bytes],
     collector_process: subprocess.Popen[bytes],
-) -> tuple[int, int]:
-    """Wait for both child processes and detect early failures."""
+    stop_condition: Callable[[], bool] | None = None,
+    stop_grace_seconds: float = 0.0,
+) -> tuple[int, int, bool]:
+    """Wait for child processes and support controlled completion."""
+
+    if stop_grace_seconds < 0:
+        raise ValueError(
+            "stop_grace_seconds must not be negative."
+        )
+
+    stop_detected_at: float | None = None
 
     while True:
         workload_return_code = workload_process.poll()
         collector_return_code = collector_process.poll()
 
-        if (
+        workload_failed = (
             workload_return_code is not None
             and workload_return_code != 0
+        )
+        collector_failed = (
+            collector_return_code is not None
+            and collector_return_code != 0
+        )
+
+        if (
+            workload_failed
             and collector_return_code is None
         ):
             _terminate_process(
@@ -284,8 +337,7 @@ def _wait_for_processes(
             )
 
         if (
-            collector_return_code is not None
-            and collector_return_code != 0
+            collector_failed
             and workload_return_code is None
         ):
             _terminate_process(
@@ -293,17 +345,61 @@ def _wait_for_processes(
                 process_name="workload",
             )
 
+        if workload_failed or collector_failed:
+            if (
+                workload_process.poll() is not None
+                and collector_process.poll() is not None
+            ):
+                break
+
+            sleep(0.25)
+            continue
+
         if (
-            workload_process.poll() is not None
-            and collector_process.poll() is not None
+            workload_return_code is not None
+            and collector_return_code is not None
         ):
             break
+
+        if (
+            stop_condition is not None
+            and stop_detected_at is None
+            and stop_condition()
+        ):
+            stop_detected_at = monotonic()
+
+            print(
+                "Controlled completion condition detected. "
+                f"Waiting {stop_grace_seconds:.1f} seconds "
+                "before stopping child processes."
+            )
+
+        if (
+            stop_detected_at is not None
+            and monotonic() - stop_detected_at
+            >= stop_grace_seconds
+        ):
+            _terminate_process(
+                workload_process,
+                process_name="workload",
+            )
+            _terminate_process(
+                collector_process,
+                process_name="collector",
+            )
+
+            return (
+                workload_process.wait(),
+                collector_process.wait(),
+                True,
+            )
 
         sleep(0.25)
 
     return (
         workload_process.wait(),
         collector_process.wait(),
+        False,
     )
 
 
@@ -313,6 +409,8 @@ def run_synchronized_experiment(
     base_url: str,
     actor: str,
     output_directory: Path,
+    stop_condition: Callable[[], bool] | None = None,
+    stop_grace_seconds: float = 0.0,
 ) -> None:
     """Run the workload and collector under one lifecycle."""
 
@@ -368,20 +466,25 @@ def run_synchronized_experiment(
 
         collector_process = subprocess.Popen(
             collector_command,
+            start_new_session=True,
         )
 
         print("Starting Locust workload...")
 
         workload_process = subprocess.Popen(
             workload_command,
+            start_new_session=True,
         )
 
         (
             workload_return_code,
             collector_return_code,
+            stopped_by_condition,
         ) = _wait_for_processes(
             workload_process=workload_process,
             collector_process=collector_process,
+            stop_condition=stop_condition,
+            stop_grace_seconds=stop_grace_seconds,
         )
 
         print(
@@ -393,16 +496,22 @@ def run_synchronized_experiment(
             f"{collector_return_code}"
         )
 
-        if workload_return_code != 0:
-            raise SynchronizedRunnerError(
-                "The Locust workload process failed with "
-                f"exit code {workload_return_code}."
-            )
+        if not stopped_by_condition:
+            if workload_return_code != 0:
+                raise SynchronizedRunnerError(
+                    "The Locust workload process failed with "
+                    f"exit code {workload_return_code}."
+                )
 
-        if collector_return_code != 0:
-            raise SynchronizedRunnerError(
-                "The metrics collector process failed with "
-                f"exit code {collector_return_code}."
+            if collector_return_code != 0:
+                raise SynchronizedRunnerError(
+                    "The metrics collector process failed with "
+                    f"exit code {collector_return_code}."
+                )
+        else:
+            print(
+                "Child processes stopped after the controlled "
+                "completion condition was satisfied."
             )
 
         completed_experiment = _transition_experiment(
@@ -411,8 +520,12 @@ def run_synchronized_experiment(
             action="complete",
             actor=actor,
             reason=(
-                "Workload and metrics collection "
-                "completed successfully."
+                "Interactive completion condition was satisfied."
+                if stopped_by_condition
+                else (
+                    "Workload and metrics collection "
+                    "completed successfully."
+                )
             ),
         )
 

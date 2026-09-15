@@ -9,8 +9,14 @@ from sqlalchemy import select
 
 from backend.app.core.config import settings
 from backend.app.db.session import SessionLocal
-from backend.app.models import Seat
-from backend.app.models.enums import SeatState
+from backend.app.models import (
+    Booking,
+    Seat,
+)
+from backend.app.models.enums import (
+    BookingStatus,
+    SeatState,
+)
 from load_testing.run_synchronized_experiment import (
     SynchronizedRunnerError,
     _api_request,
@@ -23,6 +29,8 @@ DEFAULT_BASE_URL = "http://127.0.0.1:8001"
 DEFAULT_OUTPUT_DIRECTORY = Path(
     "data/raw/locust/interactive_demo"
 )
+
+COMPLETION_GRACE_SECONDS = 5.0
 
 
 class InteractiveDemoError(ValueError):
@@ -124,6 +132,29 @@ def resolve_seat_id(
         return seat.id
 
 
+def confirmed_browser_booking_exists(
+    *,
+    experiment_run_id: UUID,
+    seat_id: int,
+) -> bool:
+    """Return whether the browser permanently booked the seat."""
+
+    with SessionLocal() as session:
+        statement = (
+            select(Booking.id)
+            .where(
+                Booking.experiment_run_id
+                == experiment_run_id,
+                Booking.seat_id == seat_id,
+                Booking.status
+                == BookingStatus.CONFIRMED,
+            )
+            .limit(1)
+        )
+
+        return session.scalar(statement) is not None
+
+
 def create_interactive_experiment(
     *,
     seat_id: int,
@@ -161,7 +192,7 @@ def create_interactive_experiment(
             "simulated_work_ms": simulated_work_ms,
             "booking_mode": "EXPERIMENT_RECYCLE",
             "random_seed": 9200 + seat_id,
-            "code_version": "interactive-demo-v3",
+            "code_version": "interactive-demo-v4",
             "created_by": "interactive-demo-runner",
         },
     )
@@ -244,7 +275,7 @@ def parse_arguments() -> argparse.Namespace:
         "--duration",
         type=_duration_seconds,
         default=120,
-        help="Experiment duration in seconds. Default: 120.",
+        help="Maximum experiment duration. Default: 120 seconds.",
     )
 
     parser.add_argument(
@@ -331,7 +362,15 @@ def main() -> int:
             "  Simulated lock work: "
             f"{arguments.simulated_work_ms} ms"
         )
-        print(f"  Duration: {arguments.duration} seconds")
+        print(
+            "  Maximum duration: "
+            f"{arguments.duration} seconds"
+        )
+        print(
+            "  Completion rule: stop "
+            f"{COMPLETION_GRACE_SECONDS:.0f} seconds "
+            "after the browser confirms the seat"
+        )
 
         run_synchronized_experiment(
             experiment_run_id=experiment_id,
@@ -339,6 +378,15 @@ def main() -> int:
             actor="interactive-demo-runner",
             output_directory=(
                 arguments.output_directory
+            ),
+            stop_condition=lambda: (
+                confirmed_browser_booking_exists(
+                    experiment_run_id=experiment_id,
+                    seat_id=seat_id,
+                )
+            ),
+            stop_grace_seconds=(
+                COMPLETION_GRACE_SECONDS
             ),
         )
 
