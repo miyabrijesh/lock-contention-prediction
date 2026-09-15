@@ -1,7 +1,13 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import (
+    CORSMiddleware,
+)
 
 from backend.app.api.routes.bookings import (
     router as bookings_router,
+)
+from backend.app.api.routes.demo import (
+    router as demo_router,
 )
 from backend.app.api.routes.experiments import (
     router as experiments_router,
@@ -30,12 +36,35 @@ app = FastAPI(
 )
 
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:4173",
+        "http://127.0.0.1:4173",
+    ],
+    allow_credentials=False,
+    allow_methods=[
+        "GET",
+        "POST",
+        "OPTIONS",
+    ],
+    allow_headers=[
+        "Accept",
+        "Content-Type",
+        "Idempotency-Key",
+    ],
+)
+
+
 app.include_router(health_router)
 app.include_router(shows_router)
 app.include_router(bookings_router)
 app.include_router(experiments_router)
 app.include_router(models_router)
 app.include_router(predictions_router)
+app.include_router(demo_router)
 
 
 @app.get(
