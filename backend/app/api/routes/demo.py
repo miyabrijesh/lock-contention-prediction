@@ -13,7 +13,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.app.db.session import get_db
-from backend.app.models import MetricSample, Prediction
+from backend.app.models import (
+    ExperimentRun,
+    MetricSample,
+    Prediction,
+)
+from backend.app.models.enums import ExperimentStatus
 from backend.app.schemas.booking import (
     BookingCreate,
     BookingErrorResponse,
@@ -89,14 +94,39 @@ def create_demo_booking(
                 ),
             },
         )
+    active_experiment_statement = (
+        select(ExperimentRun)
+        .where(
+            ExperimentRun.show_id
+            == request_body.show_id,
+            ExperimentRun.status
+            == ExperimentStatus.RUNNING,
+        )
+        .order_by(
+            ExperimentRun.started_at.desc(),
+            ExperimentRun.id.desc(),
+        )
+        .limit(1)
+    )
+
+    active_experiment = session.scalar(
+        active_experiment_statement
+    )
 
     command = BookingCommand(
         idempotency_key=idempotency_key,
         user_id=request_body.user_id,
         show_id=request_body.show_id,
         seat_id=request_body.seat_id,
-        experiment_run_id=None,
-    )
+        experiment_run_id=(
+            active_experiment.id
+            if active_experiment is not None
+            else None
+        ),
+        persist_experiment_booking=(
+            active_experiment is not None
+    ),
+)
 
     try:
         result = create_booking(
@@ -145,8 +175,15 @@ def get_demo_contention_status(
             MetricSample.id
             == Prediction.metric_sample_id,
         )
+        .join(
+            ExperimentRun,
+            ExperimentRun.id
+            == Prediction.experiment_run_id,
+        )
         .where(
-            MetricSample.is_complete.is_(True)
+            MetricSample.is_complete.is_(True),
+            ExperimentRun.status
+            == ExperimentStatus.RUNNING,
         )
         .order_by(
             Prediction.predicted_at.desc(),

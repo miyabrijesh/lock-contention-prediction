@@ -3,6 +3,9 @@ from uuid import UUID
 
 import pytest
 
+from load_testing.booking_outcomes import (
+    is_expected_business_conflict,
+)
 from load_testing.config import (
     WorkloadConfig,
     WorkloadConfigurationError,
@@ -128,3 +131,27 @@ def test_runner_passes_demand_profile_to_locust(
     assert child_environment[
         "LOAD_DEMAND_PROFILE"
     ] == "CUSTOM"
+
+
+def test_only_seat_unavailable_is_an_expected_conflict() -> None:
+    """Accept seat competition without hiding real API failures."""
+
+    assert is_expected_business_conflict(
+        409,
+        "SEAT_UNAVAILABLE",
+    )
+
+    assert not is_expected_business_conflict(
+        500,
+        "INTERNAL_ERROR",
+    )
+
+    assert not is_expected_business_conflict(
+        503,
+        "LOCK_TIMEOUT",
+    )
+
+    assert not is_expected_business_conflict(
+        409,
+        "IDEMPOTENCY_KEY_REUSED",
+    )

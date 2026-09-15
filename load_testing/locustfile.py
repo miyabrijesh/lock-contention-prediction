@@ -25,6 +25,17 @@ _workload_config: WorkloadConfig | None = None
 _internal_api_token: str | None = None
 _user_sequence = count()
 
+def _is_expected_business_conflict(
+    status_code: int,
+    error_code: str,
+) -> bool:
+    """Identify an expected concurrent seat-booking conflict."""
+
+    return (
+        status_code == 409
+        and error_code == "SEAT_UNAVAILABLE"
+    )
+
 
 def _required_internal_token() -> str:
     """Read the internal API token without printing it."""
@@ -212,6 +223,13 @@ class ReservationWorkloadUser(HttpUser):
                     )
                 except ValueError:
                     error_code = "INVALID_ERROR_RESPONSE"
+
+                if _is_expected_business_conflict(
+                    response.status_code,
+                    error_code,
+                ):
+                    response.success()
+                    return
 
                 response.failure(
                     f"HTTP {response.status_code}: "

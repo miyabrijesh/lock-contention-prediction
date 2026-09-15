@@ -42,7 +42,7 @@ class BookingCommand:
     show_id: int
     seat_id: int
     experiment_run_id: UUID | None = None
-
+    persist_experiment_booking: bool = False
 
 @dataclass(frozen=True)
 class BookingResult:
@@ -336,6 +336,7 @@ def create_booking(
             recycle_experiment = (
                 experiment_run.booking_mode
                 == "EXPERIMENT_RECYCLE"
+                and not command.persist_experiment_booking
             )
             simulated_work_ms = (
                 experiment_run.simulated_work_ms
