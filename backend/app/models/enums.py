@@ -28,6 +28,20 @@ class ExperimentStatus(str, Enum):
     CANCELLED = "CANCELLED"
 
 
+class DemoScenarioName(str, Enum):
+    BASELINE = "BASELINE"
+    CONTENTION = "CONTENTION"
+
+
+class DemoSessionStatus(str, Enum):
+    WAITING_FOR_SELECTION = "WAITING_FOR_SELECTION"
+    READY = "READY"
+    RUNNING = "RUNNING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+
+
 class RiskLevel(str, Enum):
     LOW = "LOW"
     MEDIUM = "MEDIUM"

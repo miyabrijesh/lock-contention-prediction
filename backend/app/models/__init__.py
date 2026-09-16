@@ -1,7 +1,10 @@
 from backend.app.models.booking import Booking, BookingAttempt
+from backend.app.models.demo import DemoSession
 from backend.app.models.enums import (
     AttemptOutcome,
     BookingStatus,
+    DemoScenarioName,
+    DemoSessionStatus,
     ExperimentStatus,
     RiskLevel,
     SeatState,
@@ -20,6 +23,9 @@ __all__ = [
     "BookingAttempt",
     "BookingStatus",
     "DataExport",
+    "DemoScenarioName",
+    "DemoSession",
+    "DemoSessionStatus",
     "ExperimentRun",
     "ExperimentStatus",
     "MetricSample",
