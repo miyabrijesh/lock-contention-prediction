@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.db.session import get_db
 from backend.app.models import (
+    DemoSession,
     ExperimentRun,
     MetricSample,
     Prediction,
@@ -28,11 +29,18 @@ from backend.app.schemas.booking import (
 from backend.app.schemas.demo import (
     DemoActiveExperimentRead,
     DemoContentionStatusRead,
+    DemoSeatSelectionCreate,
+    DemoSessionRead,
 )
 from backend.app.services.booking_service import (
     BookingCommand,
     BookingServiceError,
     create_booking,
+)
+from backend.app.services.demo_session_service import (
+    DemoSessionServiceError,
+    read_current_demo_session,
+    submit_demo_seat_selection,
 )
 
 
@@ -55,6 +63,57 @@ IdempotencyKey = Annotated[
         ),
     ),
 ]
+
+
+def _demo_session_http_exception(
+    error: DemoSessionServiceError,
+) -> HTTPException:
+    """Convert a demo-session error into an API response."""
+
+    return HTTPException(
+        status_code=error.status_code,
+        detail={
+            "code": error.code,
+            "message": error.message,
+        },
+    )
+
+
+def _demo_session_response(
+    demo_session: DemoSession | None,
+) -> DemoSessionRead:
+    """Build the public demo-session response."""
+
+    if demo_session is None:
+        return DemoSessionRead(
+            available=False,
+            session_id=None,
+            show_id=None,
+            status=None,
+            scenario=None,
+            selected_seat_ids=[],
+            experiment_run_id=None,
+            expires_at=None,
+            selection_submitted_at=None,
+        )
+
+    return DemoSessionRead(
+        available=True,
+        session_id=demo_session.id,
+        show_id=demo_session.show_id,
+        status=demo_session.status,
+        scenario=demo_session.scenario,
+        selected_seat_ids=list(
+            demo_session.selected_seat_ids
+        ),
+        experiment_run_id=(
+            demo_session.experiment_run_id
+        ),
+        expires_at=demo_session.expires_at,
+        selection_submitted_at=(
+            demo_session.selection_submitted_at
+        ),
+    )
 
 
 @router.post(
@@ -156,6 +215,89 @@ def create_demo_booking(
     return BookingRead.model_validate(
         result.booking
     )
+
+
+@router.get(
+    "/session",
+    response_model=DemoSessionRead,
+    summary="Read the browser-visible demo session",
+)
+def get_demo_session(
+    session: DatabaseSession,
+    show_id: Annotated[
+        int,
+        Query(
+            ge=1,
+            description=(
+                "Show whose open demo session "
+                "should be returned."
+            ),
+        ),
+    ],
+) -> DemoSessionRead:
+    """Return the terminal-created session awaiting the browser."""
+
+    try:
+        demo_session = read_current_demo_session(
+            session,
+            show_id=show_id,
+        )
+
+        return _demo_session_response(
+            demo_session
+        )
+
+    except DemoSessionServiceError as error:
+        raise _demo_session_http_exception(
+            error
+        ) from error
+
+
+@router.post(
+    "/sessions/{demo_session_id}/selection",
+    response_model=DemoSessionRead,
+    summary="Submit consecutive seats to a waiting demo",
+    responses={
+        status.HTTP_404_NOT_FOUND: {
+            "description": "Demo session or seat not found.",
+        },
+        status.HTTP_409_CONFLICT: {
+            "description": (
+                "Session state or seat availability conflict."
+            ),
+        },
+        status.HTTP_422_UNPROCESSABLE_CONTENT: {
+            "description": (
+                "Seat count, row or consecutiveness is invalid."
+            ),
+        },
+        status.HTTP_503_SERVICE_UNAVAILABLE: {
+            "description": "Database unavailable.",
+        },
+    },
+)
+def submit_demo_selection(
+    demo_session_id: UUID,
+    request_body: DemoSeatSelectionCreate,
+    session: DatabaseSession,
+) -> DemoSessionRead:
+    """Store the browser's 1–5 consecutive seats."""
+
+    try:
+        demo_session = submit_demo_seat_selection(
+            session,
+            demo_session_id=demo_session_id,
+            seat_ids=request_body.seat_ids,
+        )
+
+        return _demo_session_response(
+            demo_session
+        )
+
+    except DemoSessionServiceError as error:
+        raise _demo_session_http_exception(
+            error
+        ) from error
 
 
 @router.get(
