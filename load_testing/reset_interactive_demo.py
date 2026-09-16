@@ -1,5 +1,6 @@
 import argparse
 import sys
+from collections import Counter
 from datetime import UTC, datetime
 
 from sqlalchemy import select
@@ -21,7 +22,7 @@ from backend.app.models.enums import (
 
 
 class InteractiveDemoResetError(Exception):
-    """Expected failure while resetting an interactive demo seat."""
+    """Expected failure while resetting interactive demo seats."""
 
 
 def _normalize_seat_number(value: str) -> str:
@@ -91,57 +92,75 @@ def _ensure_no_running_experiment(
 
     if running_experiment is not None:
         raise InteractiveDemoResetError(
-            "The seat cannot be reset while experiment "
+            "Seats cannot be reset while experiment "
             f"{running_experiment.id} is running."
         )
 
 
-def _load_seat_for_update(
+def _load_seats_for_update(
     session: Session,
     *,
     show_id: int,
-    seat_number: str,
-) -> Seat:
-    """Load and lock the selected experiment seat."""
+    seat_numbers: list[str],
+) -> list[Seat]:
+    """Load and lock all requested seats in deterministic order."""
 
     statement = (
         select(Seat)
         .where(
             Seat.show_id == show_id,
-            Seat.seat_number == seat_number,
+            Seat.seat_number.in_(seat_numbers),
         )
-        .limit(1)
+        .order_by(Seat.id)
         .with_for_update()
     )
 
-    seat = session.scalar(statement)
+    seats = list(
+        session.scalars(statement).all()
+    )
 
-    if seat is None:
+    found_seat_numbers = {
+        seat.seat_number
+        for seat in seats
+    }
+    missing_seat_numbers = [
+        seat_number
+        for seat_number in seat_numbers
+        if seat_number not in found_seat_numbers
+    ]
+
+    if missing_seat_numbers:
+        missing_text = ", ".join(
+            missing_seat_numbers
+        )
         raise InteractiveDemoResetError(
-            f"Seat {seat_number} was not found "
+            f"Seats {missing_text} were not found "
             f"for show {show_id}."
         )
 
-    return seat
+    return seats
 
 
 def _load_confirmed_bookings_for_update(
     session: Session,
     *,
     show_id: int,
-    seat_id: int,
+    seat_ids: list[int],
 ) -> list[Booking]:
-    """Load confirmed experiment bookings for the seat."""
+    """Lock confirmed experiment bookings for all seats."""
 
     statement = (
         select(Booking)
         .where(
             Booking.show_id == show_id,
-            Booking.seat_id == seat_id,
+            Booking.seat_id.in_(seat_ids),
             Booking.experiment_run_id.is_not(None),
             Booking.status == BookingStatus.CONFIRMED,
         )
-        .order_by(Booking.created_at)
+        .order_by(
+            Booking.seat_id,
+            Booking.created_at,
+        )
         .with_for_update()
     )
 
@@ -150,14 +169,40 @@ def _load_confirmed_bookings_for_update(
     )
 
 
-def reset_interactive_demo_seat(
+def reset_interactive_demo_seats(
     session: Session,
     *,
     show_id: int,
-    seat_number: str,
+    seat_numbers: list[str],
     apply_changes: bool,
-) -> tuple[int, int]:
-    """Reset one experiment seat and cancel its confirmed bookings."""
+) -> tuple[list[int], int]:
+    """Atomically reset multiple experiment seats."""
+
+    if not seat_numbers:
+        raise InteractiveDemoResetError(
+            "At least one seat number is required."
+        )
+
+    normalized_seat_numbers = [
+        _normalize_seat_number(seat_number)
+        for seat_number in seat_numbers
+    ]
+
+    duplicate_seat_numbers = sorted(
+        seat_number
+        for seat_number, count
+        in Counter(normalized_seat_numbers).items()
+        if count > 1
+    )
+
+    if duplicate_seat_numbers:
+        duplicate_text = ", ".join(
+            duplicate_seat_numbers
+        )
+        raise InteractiveDemoResetError(
+            "Seat numbers must be unique. "
+            f"Repeated: {duplicate_text}."
+        )
 
     _load_experiment_show(
         session,
@@ -169,30 +214,57 @@ def reset_interactive_demo_seat(
         show_id,
     )
 
-    seat = _load_seat_for_update(
+    seats = _load_seats_for_update(
         session,
         show_id=show_id,
-        seat_number=seat_number,
+        seat_numbers=normalized_seat_numbers,
     )
+
+    seats_by_number = {
+        seat.seat_number: seat
+        for seat in seats
+    }
+    ordered_seats = [
+        seats_by_number[seat_number]
+        for seat_number in normalized_seat_numbers
+    ]
 
     confirmed_bookings = (
         _load_confirmed_bookings_for_update(
             session,
             show_id=show_id,
-            seat_id=seat.id,
+            seat_ids=[
+                seat.id
+                for seat in seats
+            ],
         )
+    )
+
+    booking_counts = Counter(
+        booking.seat_id
+        for booking in confirmed_bookings
     )
 
     print("Interactive demo reset plan:")
     print(f"  Show: {show_id}")
+    print(f"  Seats: {len(ordered_seats)}")
+
+    for seat in ordered_seats:
+        print(
+            f"  - {seat.seat_number} "
+            f"(database ID {seat.id})"
+        )
+        print(
+            f"    Current state: {seat.state.value}"
+        )
+        print(
+            "    Confirmed experiment bookings "
+            f"to cancel: {booking_counts[seat.id]}"
+        )
+
     print(
-        f"  Seat: {seat.seat_number} "
-        f"(database ID {seat.id})"
-    )
-    print(f"  Current seat state: {seat.state.value}")
-    print(
-        "  Confirmed experiment bookings to cancel: "
-        f"{len(confirmed_bookings)}"
+        "  Total confirmed experiment bookings "
+        f"to cancel: {len(confirmed_bookings)}"
     )
 
     if not apply_changes:
@@ -207,7 +279,13 @@ def reset_interactive_demo_seat(
             "to perform this reset."
         )
 
-        return seat.id, len(confirmed_bookings)
+        return (
+            [
+                seat.id
+                for seat in ordered_seats
+            ],
+            len(confirmed_bookings),
+        )
 
     reset_at = datetime.now(UTC)
 
@@ -215,21 +293,55 @@ def reset_interactive_demo_seat(
         booking.status = BookingStatus.CANCELLED
         booking.cancelled_at = reset_at
 
-    seat.state = SeatState.AVAILABLE
-    seat.hold_expires_at = None
-    seat.version += 1
+    for seat in ordered_seats:
+        seat.state = SeatState.AVAILABLE
+        seat.hold_expires_at = None
+        seat.version += 1
 
     session.commit()
 
     print()
     print("Interactive demo seat reset completed.")
     print(
-        f"  Cancelled bookings: "
+        f"  Seats reset: {len(ordered_seats)}"
+    )
+    print(
+        "  Cancelled bookings: "
         f"{len(confirmed_bookings)}"
     )
     print(f"  Seat state: {SeatState.AVAILABLE.value}")
 
-    return seat.id, len(confirmed_bookings)
+    return (
+        [
+            seat.id
+            for seat in ordered_seats
+        ],
+        len(confirmed_bookings),
+    )
+
+
+def reset_interactive_demo_seat(
+    session: Session,
+    *,
+    show_id: int,
+    seat_number: str,
+    apply_changes: bool,
+) -> tuple[int, int]:
+    """Reset one seat while preserving the original interface."""
+
+    seat_ids, cancelled_booking_count = (
+        reset_interactive_demo_seats(
+            session,
+            show_id=show_id,
+            seat_numbers=[seat_number],
+            apply_changes=apply_changes,
+        )
+    )
+
+    return (
+        seat_ids[0],
+        cancelled_booking_count,
+    )
 
 
 def _build_argument_parser() -> argparse.ArgumentParser:
@@ -237,8 +349,9 @@ def _build_argument_parser() -> argparse.ArgumentParser:
 
     parser = argparse.ArgumentParser(
         description=(
-            "Safely reset one experiment-show seat after "
-            "an interactive contention demonstration."
+            "Safely and atomically reset one or more "
+            "experiment-show seats after an interactive "
+            "contention demonstration."
         )
     )
 
@@ -246,8 +359,11 @@ def _build_argument_parser() -> argparse.ArgumentParser:
         "--seat-number",
         required=True,
         type=_normalize_seat_number,
+        action="append",
         help=(
-            "Experiment-show seat to reset, for example D9."
+            "Experiment-show seat to reset. Repeat this "
+            "option for multiple seats, for example: "
+            "--seat-number D7 --seat-number D8."
         ),
     )
     parser.add_argument(
@@ -277,16 +393,26 @@ def main() -> int:
     if arguments.show_id < 1:
         parser.error("--show-id must be a positive integer.")
 
+    if len(arguments.seat_number) != len(
+        set(arguments.seat_number)
+    ):
+        parser.error(
+            "--seat-number values must be unique."
+        )
+
     session = SessionLocal()
 
     try:
-        reset_interactive_demo_seat(
+        reset_interactive_demo_seats(
             session,
             show_id=arguments.show_id,
-            seat_number=arguments.seat_number,
+            seat_numbers=arguments.seat_number,
             apply_changes=arguments.apply,
         )
-    except InteractiveDemoResetError as error:
+    except (
+        InteractiveDemoResetError,
+        argparse.ArgumentTypeError,
+    ) as error:
         session.rollback()
         print(
             f"Interactive demo reset error: {error}",
