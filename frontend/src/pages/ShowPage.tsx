@@ -13,10 +13,12 @@ import {
 
 import {
     ApiClientError,
-    createDemoBooking,
+    createDemoBatchBooking,
     getActiveExperiment,
+    getDemoSession,
     getShow,
     listSeats,
+    submitDemoSeatSelection,
 } from '../lib/api'
 import {
     getDemoUser,
@@ -24,6 +26,7 @@ import {
 } from '../lib/demoSession'
 import type {
     ActiveExperiment,
+    DemoSession,
     RequestState,
     Seat,
     Show,
@@ -44,12 +47,101 @@ function formatScreeningTime(
     ).format(new Date(dateValue))
 }
 
+function seatPosition(
+    seatNumber: string,
+): {
+    row: string
+    number: number
+} | null {
+    const match = seatNumber.match(
+        /^([A-Za-z]+)([1-9][0-9]*)$/,
+    )
+
+    if (!match) {
+        return null
+    }
+
+    return {
+        row: match[1].toUpperCase(),
+        number: Number(match[2]),
+    }
+}
+
 function seatRow(
     seatNumber: string,
 ): string {
-    const match = seatNumber.match(/^[A-Za-z]+/)
+    return (
+        seatPosition(seatNumber)?.row
+        ?? 'Other'
+    )
+}
 
-    return match?.[0]?.toUpperCase() ?? 'Other'
+function sameSeatIds(
+    left: number[],
+    right: number[],
+): boolean {
+    if (left.length !== right.length) {
+        return false
+    }
+
+    const rightIds = new Set(right)
+
+    return left.every(
+        (seatId) => rightIds.has(seatId),
+    )
+}
+
+function validConsecutiveSelection(
+    selectedSeats: Seat[],
+): boolean {
+    if (
+        selectedSeats.length < 1
+        || selectedSeats.length > 5
+    ) {
+        return false
+    }
+
+    const positions = selectedSeats.map(
+        (seat) => seatPosition(
+            seat.seat_number,
+        ),
+    )
+
+    if (positions.some(
+        (position) => position === null,
+    )) {
+        return false
+    }
+
+    const validPositions = positions.filter(
+        (
+            position,
+        ): position is {
+            row: string
+            number: number
+        } => position !== null,
+    )
+
+    const rows = new Set(
+        validPositions.map(
+            (position) => position.row,
+        ),
+    )
+
+    if (rows.size !== 1) {
+        return false
+    }
+
+    const numbers = validPositions
+        .map((position) => position.number)
+        .sort((left, right) => left - right)
+
+    return numbers.every(
+        (number, index) => (
+            index === 0
+            || number === numbers[index - 1] + 1
+        ),
+    )
 }
 
 export function ShowPage() {
@@ -61,9 +153,10 @@ export function ShowPage() {
 
     const [show, setShow] = useState<Show | null>(null)
     const [seats, setSeats] = useState<Seat[]>([])
-    const [selectedSeatId, setSelectedSeatId] = (
-        useState<number | null>(null)
-    )
+    const [
+        selectedSeatIds,
+        setSelectedSeatIds,
+    ] = useState<number[]>([])
     const [requestState, setRequestState] = (
         useState<RequestState>('loading')
     )
@@ -73,61 +166,72 @@ export function ShowPage() {
     const [errorMessage, setErrorMessage] = (
         useState<string | null>(null)
     )
-    const [activeExperiment, setActiveExperiment] = (
-        useState<ActiveExperiment | null>(null)
+    const [
+        activeExperiment,
+        setActiveExperiment,
+    ] = useState<ActiveExperiment | null>(null)
+    const [
+        demoSession,
+        setDemoSession,
+    ] = useState<DemoSession | null>(null)
+
+    const loadScreening = useCallback(
+        async (): Promise<void> => {
+            if (
+                !Number.isInteger(numericShowId)
+                || numericShowId < 1
+            ) {
+                setRequestState('error')
+                setErrorMessage(
+                    'The screening identifier is invalid.',
+                )
+                return
+            }
+
+            setRequestState('loading')
+            setErrorMessage(null)
+
+            try {
+                const [
+                    nextShow,
+                    nextSeats,
+                ] = await Promise.all([
+                    getShow(numericShowId),
+                    listSeats(numericShowId),
+                ])
+
+                setShow(nextShow)
+                setSeats(nextSeats)
+                setSelectedSeatIds(
+                    (currentSeatIds) => (
+                        currentSeatIds.filter(
+                            (seatId) => (
+                                nextSeats.some(
+                                    (seat) => (
+                                        seat.id === seatId
+                                        && seat.state
+                                        === 'AVAILABLE'
+                                    ),
+                                )
+                            ),
+                        )
+                    ),
+                )
+                setRequestState('success')
+            } catch (error) {
+                setRequestState('error')
+                setErrorMessage(
+                    error instanceof ApiClientError
+                        ? error.message
+                        : (
+                            'The screening could not '
+                            + 'be loaded.'
+                        ),
+                )
+            }
+        },
+        [numericShowId],
     )
-
-    const loadScreening = useCallback(async (): Promise<void> => {
-        if (
-            !Number.isInteger(numericShowId)
-            || numericShowId < 1
-        ) {
-            setRequestState('error')
-            setErrorMessage(
-                'The screening identifier is invalid.',
-            )
-            return
-        }
-
-        setRequestState('loading')
-        setErrorMessage(null)
-
-        try {
-            const [
-                nextShow,
-                nextSeats,
-            ] = await Promise.all([
-                getShow(numericShowId),
-                listSeats(numericShowId),
-            ])
-
-            setShow(nextShow)
-            setSeats(nextSeats)
-            setSelectedSeatId((currentSeatId) => {
-                if (currentSeatId === null) {
-                    return null
-                }
-
-                const currentSeat = nextSeats.find(
-                    (seat) => seat.id === currentSeatId,
-                )
-
-                return (
-                    currentSeat?.state === 'AVAILABLE'
-                        ? currentSeatId
-                        : null
-                )
-            })
-            setRequestState('success')
-        } catch (error) {
-            setRequestState('error')
-            setErrorMessage(
-                error instanceof ApiClientError
-                    ? error.message
-                    : 'The screening could not be loaded.',
-            )
-        }
-    }, [numericShowId])
 
     useEffect(() => {
         const timerId = window.setTimeout(() => {
@@ -149,29 +253,55 @@ export function ShowPage() {
 
         let mounted = true
 
-        async function loadExperiment(): Promise<void> {
-            try {
-                const result = await getActiveExperiment(
-                    numericShowId,
-                )
+        async function loadLiveState(): Promise<void> {
+            const [
+                experimentResult,
+                sessionResult,
+            ] = await Promise.allSettled([
+                getActiveExperiment(numericShowId),
+                getDemoSession(numericShowId),
+            ])
 
-                if (mounted) {
-                    setActiveExperiment(result)
+            if (!mounted) {
+                return
+            }
+
+            if (experimentResult.status === 'fulfilled') {
+                setActiveExperiment(
+                    experimentResult.value,
+                )
+            } else {
+                setActiveExperiment(null)
+            }
+
+            if (sessionResult.status === 'fulfilled') {
+                const nextSession = sessionResult.value
+
+                setDemoSession(nextSession)
+
+                if (
+                    nextSession.available
+                    && (
+                        nextSession.status === 'READY'
+                        || nextSession.status === 'RUNNING'
+                    )
+                ) {
+                    setSelectedSeatIds(
+                        nextSession.selectedSeatIds,
+                    )
                 }
-            } catch {
-                if (mounted) {
-                    setActiveExperiment(null)
-                }
+            } else {
+                setDemoSession(null)
             }
         }
 
         const initialTimer = window.setTimeout(() => {
-            void loadExperiment()
+            void loadLiveState()
         }, 0)
 
         const intervalId = window.setInterval(() => {
-            void loadExperiment()
-        }, 2000)
+            void loadLiveState()
+        }, 1000)
 
         return () => {
             mounted = false
@@ -206,9 +336,25 @@ export function ShowPage() {
         return Array.from(grouped.entries())
     }, [seats])
 
-    const selectedSeat = seats.find(
-        (seat) => seat.id === selectedSeatId,
-    ) ?? null
+    const selectedSeats = useMemo(
+        () => (
+            selectedSeatIds
+                .map(
+                    (seatId) => seats.find(
+                        (seat) => seat.id === seatId,
+                    ),
+                )
+                .filter(
+                    (seat): seat is Seat => (
+                        seat !== undefined
+                    ),
+                )
+        ),
+        [
+            seats,
+            selectedSeatIds,
+        ],
+    )
 
     const contestedSeatIds = useMemo(
         () => new Set(
@@ -231,59 +377,204 @@ export function ShowPage() {
         ],
     )
 
-    const selectedSeatIsContested = (
-        selectedSeat !== null
-        && contestedSeatIds.has(selectedSeat.id)
+    const selectedSeatsMatchExperiment = (
+        activeExperiment?.active === true
+        && sameSeatIds(
+            selectedSeatIds,
+            activeExperiment.hotspotSeatIds,
+        )
     )
 
-    const experimentBookingReady = (
-        !show?.is_experiment_show
-        || (
-            activeExperiment?.active === true
-            && selectedSeatIsContested
-        )
+    const waitingForSelection = (
+        show?.is_experiment_show === true
+        && demoSession?.available === true
+        && demoSession.status
+        === 'WAITING_FOR_SELECTION'
+    )
+
+    const selectionSubmitted = (
+        show?.is_experiment_show === true
+        && demoSession?.available === true
+        && demoSession.status === 'READY'
+    )
+
+    const liveDemoReady = (
+        show?.is_experiment_show === true
+        && demoSession?.available === true
+        && demoSession.status === 'RUNNING'
+        && selectedSeatsMatchExperiment
+    )
+
+    const selectionLocked = (
+        show?.is_experiment_show === true
+        && !waitingForSelection
     )
 
     function selectSeat(seat: Seat): void {
         if (
             seat.state !== 'AVAILABLE'
             || bookingState === 'loading'
+            || selectionLocked
         ) {
             return
         }
 
-        setSelectedSeatId(
-            seat.id === selectedSeatId
-                ? null
-                : seat.id,
+        const alreadySelected = (
+            selectedSeatIds.includes(seat.id)
+        )
+
+        const candidateIds = (
+            alreadySelected
+                ? selectedSeatIds.filter(
+                    (seatId) => seatId !== seat.id,
+                )
+                : [
+                    ...selectedSeatIds,
+                    seat.id,
+                ]
+        )
+
+        if (candidateIds.length === 0) {
+            setSelectedSeatIds([])
+            setErrorMessage(null)
+            return
+        }
+
+        if (candidateIds.length > 5) {
+            setErrorMessage(
+                'You can select a maximum of five seats.',
+            )
+            return
+        }
+
+        const candidateSeats = candidateIds
+            .map(
+                (seatId) => seats.find(
+                    (candidateSeat) => (
+                        candidateSeat.id === seatId
+                    ),
+                ),
+            )
+            .filter(
+                (
+                    candidateSeat,
+                ): candidateSeat is Seat => (
+                    candidateSeat !== undefined
+                ),
+            )
+
+        if (
+            !validConsecutiveSelection(
+                candidateSeats,
+            )
+        ) {
+            setErrorMessage(
+                'Select 1–5 consecutive seats '
+                + 'from the same row.',
+            )
+            return
+        }
+
+        candidateSeats.sort((left, right) => {
+            const leftPosition = seatPosition(
+                left.seat_number,
+            )
+            const rightPosition = seatPosition(
+                right.seat_number,
+            )
+
+            return (
+                (leftPosition?.number ?? 0)
+                - (rightPosition?.number ?? 0)
+            )
+        })
+
+        setSelectedSeatIds(
+            candidateSeats.map(
+                (candidateSeat) => candidateSeat.id,
+            ),
         )
         setErrorMessage(null)
     }
 
-    async function completeBooking(): Promise<void> {
-        if (!show || !selectedSeat) {
+    async function submitSelection(): Promise<void> {
+        if (
+            !demoSession?.sessionId
+            || !waitingForSelection
+        ) {
             setErrorMessage(
-                'Select one available seat to continue.',
+                'Start the interactive runner before '
+                + 'submitting seats.',
+            )
+            return
+        }
+
+        if (
+            !validConsecutiveSelection(
+                selectedSeats,
+            )
+        ) {
+            setErrorMessage(
+                'Select 1–5 consecutive available seats '
+                + 'from the same row.',
+            )
+            return
+        }
+
+        setBookingState('loading')
+        setErrorMessage(null)
+
+        try {
+            const nextSession = (
+                await submitDemoSeatSelection(
+                    demoSession.sessionId,
+                    selectedSeatIds,
+                )
+            )
+
+            setDemoSession(nextSession)
+            setSelectedSeatIds(
+                nextSession.selectedSeatIds,
+            )
+            setBookingState('idle')
+        } catch (error) {
+            setBookingState('error')
+            setErrorMessage(
+                error instanceof ApiClientError
+                    ? error.message
+                    : (
+                        'The seat selection could '
+                        + 'not be submitted.'
+                    ),
+            )
+        }
+    }
+
+    async function completeBooking(): Promise<void> {
+        if (!show || selectedSeats.length === 0) {
+            setErrorMessage(
+                'Select at least one available seat.',
             )
             return
         }
 
         if (show.is_experiment_show) {
-            if (!activeExperiment?.active) {
-                setErrorMessage(
-                    'No contention experiment is currently '
-                    + 'running. Start the interactive runner '
-                    + 'before booking.',
-                )
+            if (waitingForSelection) {
+                await submitSelection()
                 return
             }
 
-            if (!contestedSeatIds.has(selectedSeat.id)) {
+            if (!liveDemoReady) {
                 setErrorMessage(
-                    'Select the seat targeted by the live '
-                    + `experiment: ${contestedSeatNumbers.join(', ')
-                    || 'the highlighted seat'
-                    }.`,
+                    selectionSubmitted
+                        ? (
+                            'The runner is preparing the '
+                            + 'experiment. Please wait.'
+                        )
+                        : (
+                            'No live demo is ready for '
+                            + 'this selection.'
+                        ),
                 )
                 return
             }
@@ -307,25 +598,35 @@ export function ShowPage() {
         setErrorMessage(null)
 
         try {
-            const booking = await createDemoBooking({
-                user_id: user.syntheticUserId,
-                show_id: show.id,
-                seat_id: selectedSeat.id,
+            const result = await createDemoBatchBooking({
+                userId: user.syntheticUserId,
+                showId: show.id,
+                seatIds: selectedSeatIds,
             })
 
+            const firstBooking = result.bookings[0]
+
+            if (!firstBooking) {
+                throw new Error(
+                    'The booking response was empty.',
+                )
+            }
+
             const reference = (
-                booking.id.replaceAll('-', '')
+                firstBooking.id.replaceAll('-', '')
                     .slice(0, 10)
                     .toUpperCase()
             )
 
             saveBookingConfirmation({
-                bookingIds: [booking.id],
+                bookingIds: result.bookings.map(
+                    (booking) => booking.id,
+                ),
                 reference,
                 show,
-                seats: [selectedSeat],
+                seats: selectedSeats,
                 customer: user,
-                bookedAt: booking.booked_at,
+                bookedAt: firstBooking.booked_at,
             })
 
             setBookingState('success')
@@ -338,10 +639,10 @@ export function ShowPage() {
                 && error.code === 'SEAT_UNAVAILABLE'
             ) {
                 setErrorMessage(
-                    'That seat was booked by another request. '
-                    + 'Choose another available seat.',
+                    'One or more selected seats were '
+                    + 'booked by another request.',
                 )
-                setSelectedSeatId(null)
+                setSelectedSeatIds([])
                 await loadScreening()
                 return
             }
@@ -349,10 +650,59 @@ export function ShowPage() {
             setErrorMessage(
                 error instanceof ApiClientError
                     ? error.message
-                    : 'The booking could not be completed.',
+                    : (
+                        'The booking could not '
+                        + 'be completed.'
+                    ),
             )
         }
     }
+
+    function primaryButtonText(): string {
+        if (bookingState === 'loading') {
+            return (
+                waitingForSelection
+                    ? 'Submitting seats'
+                    : 'Reserving seats'
+            )
+        }
+
+        if (!show?.is_experiment_show) {
+            return 'Confirm booking'
+        }
+
+        if (waitingForSelection) {
+            return (
+                selectedSeats.length > 0
+                    ? `Submit ${selectedSeats.length} seat${
+                        selectedSeats.length === 1
+                            ? ''
+                            : 's'
+                    }`
+                    : 'Select seats'
+            )
+        }
+
+        if (selectionSubmitted) {
+            return 'Preparing experiment'
+        }
+
+        if (liveDemoReady) {
+            return 'Confirm booking'
+        }
+
+        return 'Waiting for demo runner'
+    }
+
+    const primaryButtonDisabled = (
+        selectedSeats.length === 0
+        || bookingState === 'loading'
+        || (
+            show?.is_experiment_show === true
+            && !waitingForSelection
+            && !liveDemoReady
+        )
+    )
 
     if (requestState === 'loading') {
         return (
@@ -404,7 +754,7 @@ export function ShowPage() {
                     </Link>
 
                     <p className="eyebrow">
-                        Select one seat
+                        Select 1–5 consecutive seats
                     </p>
 
                     <h1>
@@ -469,7 +819,7 @@ export function ShowPage() {
                                         + 'seat-swatch--selected'
                                     }
                                 />
-                                Live contested seat
+                                Live contested seats
                             </span>
                         ) : null}
                     </div>
@@ -490,7 +840,9 @@ export function ShowPage() {
                                 <div className="seat-row__seats">
                                     {rowSeats.map((seat) => {
                                         const selected = (
-                                            seat.id === selectedSeatId
+                                            selectedSeatIds.includes(
+                                                seat.id,
+                                            )
                                         )
                                         const contested = (
                                             contestedSeatIds.has(
@@ -516,7 +868,10 @@ export function ShowPage() {
                                         const seatDescription = (
                                             selected
                                                 ? 'selected'
-                                                : seat.state.toLowerCase()
+                                                : (
+                                                    seat.state
+                                                        .toLowerCase()
+                                                )
                                         )
 
                                         return (
@@ -527,10 +882,15 @@ export function ShowPage() {
                                                 disabled={
                                                     seat.state
                                                     !== 'AVAILABLE'
+                                                    || (
+                                                        selectionLocked
+                                                        && !selected
+                                                    )
                                                 }
                                                 aria-pressed={selected}
                                                 aria-label={
-                                                    `${seat.seat_number}: ${seatDescription
+                                                    `${seat.seat_number}: ${
+                                                        seatDescription
                                                     }${contested
                                                         ? ', live contested seat'
                                                         : ''
@@ -581,9 +941,15 @@ export function ShowPage() {
                     </p>
 
                     <h2>
-                        {selectedSeat
-                            ? `Seat ${selectedSeat.seat_number}`
-                            : 'No seat selected'}
+                        {selectedSeats.length > 0
+                            ? selectedSeats
+                                .map(
+                                    (seat) => (
+                                        seat.seat_number
+                                    ),
+                                )
+                                .join(', ')
+                            : 'No seats selected'}
                     </h2>
 
                     <dl>
@@ -598,15 +964,28 @@ export function ShowPage() {
                         </div>
 
                         <div>
-                            <dt>Ticket</dt>
+                            <dt>Tickets</dt>
                             <dd>
-                                {selectedSeat ? '₹240' : '—'}
+                                {selectedSeats.length > 0
+                                    ? (
+                                        `${selectedSeats.length} × ₹240`
+                                    )
+                                    : '—'}
                             </dd>
                         </div>
 
                         <div>
-                            <dt>Booking fee</dt>
-                            <dd>₹0</dd>
+                            <dt>Total</dt>
+                            <dd>
+                                {selectedSeats.length > 0
+                                    ? (
+                                        `₹${
+                                            selectedSeats.length
+                                            * 240
+                                        }`
+                                    )
+                                    : '₹0'}
+                            </dd>
                         </div>
                     </dl>
 
@@ -615,25 +994,28 @@ export function ShowPage() {
                             className="booking-summary__notice"
                             aria-live="polite"
                         >
-                            {activeExperiment?.active
+                            {waitingForSelection
                                 ? (
-                                    'Live contention experiment '
-                                    + 'running. Contested seat: '
-                                    + (
-                                        contestedSeatNumbers.join(
-                                            ', ',
-                                        )
-                                        || 'loading'
-                                    )
-                                    + '.'
+                                    'The demo runner is waiting. '
+                                    + 'Choose 1–5 consecutive '
+                                    + 'seats and submit them.'
                                 )
-                                : (
-                                    'Waiting for a live contention '
-                                    + 'experiment. Select the seat '
-                                    + 'specified in the runner, then '
-                                    + 'confirm when the experiment '
-                                    + 'becomes active.'
-                                )}
+                                : selectionSubmitted
+                                    ? (
+                                        'Selection submitted. '
+                                        + 'The runner is preparing '
+                                        + 'the experiment.'
+                                    )
+                                    : liveDemoReady
+                                        ? (
+                                            'Live experiment running '
+                                            + `for ${contestedSeatNumbers
+                                                .join(', ')}.`
+                                        )
+                                        : (
+                                            'Run the interactive demo '
+                                            + 'command to begin.'
+                                        )}
                         </p>
                     ) : null}
 
@@ -654,23 +1036,12 @@ export function ShowPage() {
                     <button
                         className="primary-button primary-button--wide"
                         type="button"
-                        disabled={
-                            !selectedSeat
-                            || bookingState === 'loading'
-                            || !experimentBookingReady
-                        }
+                        disabled={primaryButtonDisabled}
                         onClick={() => {
                             void completeBooking()
                         }}
                     >
-                        {bookingState === 'loading'
-                            ? 'Reserving seat'
-                            : (
-                                show.is_experiment_show
-                                    && !activeExperiment?.active
-                                    ? 'Waiting for experiment'
-                                    : 'Confirm booking'
-                            )}
+                        {primaryButtonText()}
                     </button>
                 </aside>
             </div>

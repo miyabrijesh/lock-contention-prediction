@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from time import perf_counter, sleep
-from uuid import UUID
+from uuid import UUID, uuid5
 
 from sqlalchemy.exc import (
     IntegrityError,
@@ -25,6 +25,7 @@ from backend.app.repositories.booking_repository import (
     get_booking_by_idempotency_key,
     get_experiment_run,
     get_seat_for_update,
+    get_seats_for_update,
     get_show,
     get_synthetic_user,
 )
@@ -535,6 +536,516 @@ def create_booking(
         _record_failed_attempt(
             session,
             command=command,
+            requested_at=requested_at,
+            started_at=started_at,
+            persisted_experiment_run_id=(
+                persisted_experiment_run_id
+            ),
+            error=service_error,
+        )
+
+        raise service_error from database_error
+
+
+@dataclass(frozen=True)
+class BatchBookingCommand:
+    """One atomic browser booking covering multiple seats."""
+
+    batch_idempotency_key: UUID
+    user_id: int
+    show_id: int
+    seat_ids: tuple[int, ...]
+    experiment_run_id: UUID | None = None
+
+
+@dataclass(frozen=True)
+class BatchBookingResult:
+    """Bookings returned by one atomic batch transaction."""
+
+    bookings: tuple[Booking, ...]
+    replayed: bool
+
+
+def _batch_booking_commands(
+    command: BatchBookingCommand,
+) -> tuple[BookingCommand, ...]:
+    """Create deterministic per-seat booking commands."""
+
+    return tuple(
+        BookingCommand(
+            idempotency_key=uuid5(
+                command.batch_idempotency_key,
+                (
+                    f"{command.show_id}:"
+                    f"{seat_id}"
+                ),
+            ),
+            user_id=command.user_id,
+            show_id=command.show_id,
+            seat_id=seat_id,
+            experiment_run_id=(
+                command.experiment_run_id
+            ),
+            persist_experiment_booking=True,
+        )
+        for seat_id in command.seat_ids
+    )
+
+
+def _record_failed_batch_attempts(
+    session: Session,
+    *,
+    commands: tuple[BookingCommand, ...],
+    requested_at: datetime,
+    started_at: float,
+    persisted_experiment_run_id: UUID | None,
+    error: BookingServiceError,
+) -> None:
+    """Roll back the batch and record one failure per seat."""
+
+    session.rollback()
+
+    try:
+        for command in commands:
+            _add_attempt_to_session(
+                session,
+                command=command,
+                requested_at=requested_at,
+                started_at=started_at,
+                persisted_experiment_run_id=(
+                    persisted_experiment_run_id
+                ),
+                outcome=_outcome_for_error(error),
+                http_status=error.status_code,
+                error_code=error.code,
+            )
+
+        session.commit()
+
+    except SQLAlchemyError:
+        session.rollback()
+        logger.exception(
+            "Unable to persist batch-booking telemetry."
+        )
+
+
+def create_bookings_atomically(
+    session: Session,
+    command: BatchBookingCommand,
+) -> BatchBookingResult:
+    """Book every selected seat in one database transaction."""
+
+    requested_at = datetime.now(UTC)
+    started_at = perf_counter()
+    persisted_experiment_run_id: UUID | None = None
+    commands = _batch_booking_commands(command)
+
+    try:
+        if not 1 <= len(command.seat_ids) <= 5:
+            raise BookingServiceError(
+                code="DEMO_SEAT_COUNT_INVALID",
+                message="Select between 1 and 5 seats.",
+                status_code=422,
+            )
+
+        if len(command.seat_ids) != len(
+            set(command.seat_ids)
+        ):
+            raise BookingServiceError(
+                code="DEMO_SEAT_DUPLICATED",
+                message="Selected seat IDs must be unique.",
+                status_code=422,
+            )
+
+        existing_bookings = [
+            get_booking_by_idempotency_key(
+                session,
+                seat_command.idempotency_key,
+            )
+            for seat_command in commands
+        ]
+
+        if any(
+            booking is not None
+            for booking in existing_bookings
+        ):
+            if any(
+                booking is None
+                for booking in existing_bookings
+            ):
+                raise BookingServiceError(
+                    code="IDEMPOTENCY_KEY_REUSED",
+                    message=(
+                        "The batch idempotency key was only "
+                        "partially associated with this request."
+                    ),
+                    status_code=409,
+                )
+
+            replayed_bookings = tuple(
+                booking
+                for booking in existing_bookings
+                if booking is not None
+            )
+
+            if any(
+                not _request_matches_booking(
+                    seat_command,
+                    booking,
+                )
+                for seat_command, booking in zip(
+                    commands,
+                    replayed_bookings,
+                    strict=True,
+                )
+            ):
+                raise BookingServiceError(
+                    code="IDEMPOTENCY_KEY_REUSED",
+                    message=(
+                        "The batch idempotency key was "
+                        "previously used for another request."
+                    ),
+                    status_code=409,
+                )
+
+            for seat_command, booking in zip(
+                commands,
+                replayed_bookings,
+                strict=True,
+            ):
+                _add_attempt_to_session(
+                    session,
+                    command=seat_command,
+                    requested_at=requested_at,
+                    started_at=started_at,
+                    persisted_experiment_run_id=(
+                        booking.experiment_run_id
+                    ),
+                    outcome=AttemptOutcome.SUCCESS,
+                    http_status=200,
+                    error_code=None,
+                )
+
+            session.commit()
+
+            for booking in replayed_bookings:
+                session.refresh(booking)
+
+            return BatchBookingResult(
+                bookings=replayed_bookings,
+                replayed=True,
+            )
+
+        synthetic_user = get_synthetic_user(
+            session,
+            command.user_id,
+        )
+
+        if synthetic_user is None:
+            raise BookingServiceError(
+                code="USER_NOT_FOUND",
+                message=(
+                    "The requested synthetic user "
+                    "was not found."
+                ),
+                status_code=404,
+            )
+
+        show = get_show(
+            session,
+            command.show_id,
+        )
+
+        if show is None:
+            raise BookingServiceError(
+                code="SHOW_NOT_FOUND",
+                message="The requested show was not found.",
+                status_code=404,
+            )
+
+        if command.experiment_run_id is None:
+            if show.is_experiment_show:
+                raise BookingServiceError(
+                    code="EXPERIMENT_NOT_RUNNING",
+                    message=(
+                        "Start the interactive experiment "
+                        "before confirming these seats."
+                    ),
+                    status_code=409,
+                )
+        else:
+            if not settings.experiment_mode_enabled:
+                raise BookingServiceError(
+                    code="EXPERIMENT_MODE_DISABLED",
+                    message=(
+                        "Experiment booking mode is disabled."
+                    ),
+                    status_code=403,
+                )
+
+            experiment_run = get_experiment_run(
+                session,
+                command.experiment_run_id,
+            )
+
+            if experiment_run is None:
+                raise BookingServiceError(
+                    code="EXPERIMENT_NOT_FOUND",
+                    message=(
+                        "The requested experiment "
+                        "was not found."
+                    ),
+                    status_code=404,
+                )
+
+            persisted_experiment_run_id = (
+                experiment_run.id
+            )
+
+            if (
+                experiment_run.status
+                != ExperimentStatus.RUNNING
+            ):
+                raise BookingServiceError(
+                    code="EXPERIMENT_NOT_RUNNING",
+                    message=(
+                        "The requested experiment "
+                        "is not running."
+                    ),
+                    status_code=409,
+                )
+
+            if (
+                experiment_run.show_id
+                != command.show_id
+                or not show.is_experiment_show
+            ):
+                raise BookingServiceError(
+                    code="EXPERIMENT_SHOW_MISMATCH",
+                    message=(
+                        "The experiment does not belong "
+                        "to the requested show."
+                    ),
+                    status_code=409,
+                )
+
+            if set(
+                command.seat_ids
+            ) != set(
+                experiment_run.hotspot_seat_ids
+            ):
+                raise BookingServiceError(
+                    code="DEMO_SELECTION_MISMATCH",
+                    message=(
+                        "The requested seats do not match "
+                        "the active demo selection."
+                    ),
+                    status_code=409,
+                )
+
+        locked_seats = get_seats_for_update(
+            session,
+            list(command.seat_ids),
+        )
+
+        seats_by_id = {
+            seat.id: seat
+            for seat in locked_seats
+        }
+
+        if set(seats_by_id) != set(command.seat_ids):
+            raise BookingServiceError(
+                code="SEAT_NOT_FOUND",
+                message=(
+                    "One or more requested seats "
+                    "were not found."
+                ),
+                status_code=404,
+            )
+
+        ordered_seats = [
+            seats_by_id[seat_id]
+            for seat_id in command.seat_ids
+        ]
+
+        if any(
+            seat.show_id != command.show_id
+            for seat in ordered_seats
+        ):
+            raise BookingServiceError(
+                code="SEAT_SHOW_MISMATCH",
+                message=(
+                    "One or more seats do not belong "
+                    "to the requested show."
+                ),
+                status_code=409,
+            )
+
+        current_time = datetime.now(UTC)
+
+        for seat in ordered_seats:
+            if (
+                seat.state == SeatState.HELD
+                and seat.hold_expires_at is not None
+                and seat.hold_expires_at <= current_time
+            ):
+                seat.state = SeatState.AVAILABLE
+                seat.hold_expires_at = None
+
+        if any(
+            seat.state != SeatState.AVAILABLE
+            for seat in ordered_seats
+        ):
+            raise BookingServiceError(
+                code="SEAT_UNAVAILABLE",
+                message=(
+                    "One or more selected seats are "
+                    "no longer available."
+                ),
+                status_code=409,
+            )
+
+        bookings: list[Booking] = []
+
+        for seat_command, seat in zip(
+            commands,
+            ordered_seats,
+            strict=True,
+        ):
+            seat.state = SeatState.BOOKED
+            seat.hold_expires_at = None
+            seat.version += 1
+
+            booking = Booking(
+                idempotency_key=(
+                    seat_command.idempotency_key
+                ),
+                user_id=command.user_id,
+                show_id=command.show_id,
+                seat_id=seat.id,
+                experiment_run_id=(
+                    command.experiment_run_id
+                ),
+                status=BookingStatus.CONFIRMED,
+            )
+
+            session.add(booking)
+            bookings.append(booking)
+
+            _add_attempt_to_session(
+                session,
+                command=seat_command,
+                requested_at=requested_at,
+                started_at=started_at,
+                persisted_experiment_run_id=(
+                    persisted_experiment_run_id
+                ),
+                outcome=AttemptOutcome.SUCCESS,
+                http_status=201,
+                error_code=None,
+            )
+
+        session.commit()
+
+        for booking in bookings:
+            session.refresh(booking)
+
+        return BatchBookingResult(
+            bookings=tuple(bookings),
+            replayed=False,
+        )
+
+    except BookingServiceError as error:
+        _record_failed_batch_attempts(
+            session,
+            commands=commands,
+            requested_at=requested_at,
+            started_at=started_at,
+            persisted_experiment_run_id=(
+                persisted_experiment_run_id
+            ),
+            error=error,
+        )
+        raise
+
+    except IntegrityError as database_error:
+        service_error = BookingServiceError(
+            code="SEAT_UNAVAILABLE",
+            message=(
+                "The booking conflicted with another "
+                "completed booking."
+            ),
+            status_code=409,
+        )
+
+        _record_failed_batch_attempts(
+            session,
+            commands=commands,
+            requested_at=requested_at,
+            started_at=started_at,
+            persisted_experiment_run_id=(
+                persisted_experiment_run_id
+            ),
+            error=service_error,
+        )
+
+        raise service_error from database_error
+
+    except OperationalError as database_error:
+        sqlstate = _get_sqlstate(database_error)
+
+        if sqlstate == "55P03":
+            service_error = BookingServiceError(
+                code="LOCK_TIMEOUT",
+                message=(
+                    "The selected seat locks could not "
+                    "be acquired in time."
+                ),
+                status_code=503,
+            )
+        elif sqlstate == "57014":
+            service_error = BookingServiceError(
+                code="DATABASE_TIMEOUT",
+                message=(
+                    "The database statement exceeded "
+                    "the configured timeout."
+                ),
+                status_code=503,
+            )
+        else:
+            service_error = BookingServiceError(
+                code="INTERNAL_ERROR",
+                message=(
+                    "An unexpected database error occurred."
+                ),
+                status_code=500,
+            )
+
+        _record_failed_batch_attempts(
+            session,
+            commands=commands,
+            requested_at=requested_at,
+            started_at=started_at,
+            persisted_experiment_run_id=(
+                persisted_experiment_run_id
+            ),
+            error=service_error,
+        )
+
+        raise service_error from database_error
+
+    except SQLAlchemyError as database_error:
+        service_error = BookingServiceError(
+            code="INTERNAL_ERROR",
+            message=(
+                "An unexpected database error occurred."
+            ),
+            status_code=500,
+        )
+
+        _record_failed_batch_attempts(
+            session,
+            commands=commands,
             requested_at=requested_at,
             started_at=started_at,
             persisted_experiment_run_id=(

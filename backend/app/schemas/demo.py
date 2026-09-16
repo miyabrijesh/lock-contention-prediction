@@ -9,6 +9,8 @@ from pydantic import (
 )
 from pydantic.alias_generators import to_camel
 
+from backend.app.schemas.booking import BookingRead
+
 from backend.app.models.enums import (
     DemoScenarioName,
     DemoSessionStatus,
@@ -54,6 +56,56 @@ class DemoActiveExperimentRead(BaseModel):
     hotspot_seat_ids: list[int]
     started_at: datetime | None
     duration_sec: int | None
+
+
+
+class DemoBookingBatchCreate(BaseModel):
+    """One atomic browser booking for 1–5 seats."""
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+        extra="forbid",
+    )
+
+    user_id: int = Field(gt=0)
+    show_id: int = Field(gt=0)
+    seat_ids: list[int] = Field(
+        min_length=1,
+        max_length=5,
+    )
+
+    @field_validator("seat_ids")
+    @classmethod
+    def validate_batch_seat_ids(
+        cls,
+        value: list[int],
+    ) -> list[int]:
+        """Require positive and unique batch seat IDs."""
+
+        if any(seat_id <= 0 for seat_id in value):
+            raise ValueError(
+                "Every seat ID must be positive."
+            )
+
+        if len(value) != len(set(value)):
+            raise ValueError(
+                "Seat IDs must be unique."
+            )
+
+        return value
+
+
+class DemoBookingBatchRead(BaseModel):
+    """Bookings created by one atomic browser request."""
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+    bookings: list[BookingRead]
+    replayed: bool
 
 
 class DemoSeatSelectionCreate(BaseModel):

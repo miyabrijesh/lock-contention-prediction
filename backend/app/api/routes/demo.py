@@ -20,7 +20,10 @@ from backend.app.models import (
     MetricSample,
     Prediction,
 )
-from backend.app.models.enums import ExperimentStatus
+from backend.app.models.enums import (
+    DemoSessionStatus,
+    ExperimentStatus,
+)
 from backend.app.schemas.booking import (
     BookingCreate,
     BookingErrorResponse,
@@ -28,14 +31,18 @@ from backend.app.schemas.booking import (
 )
 from backend.app.schemas.demo import (
     DemoActiveExperimentRead,
+    DemoBookingBatchCreate,
+    DemoBookingBatchRead,
     DemoContentionStatusRead,
     DemoSeatSelectionCreate,
     DemoSessionRead,
 )
 from backend.app.services.booking_service import (
+    BatchBookingCommand,
     BookingCommand,
     BookingServiceError,
     create_booking,
+    create_bookings_atomically,
 )
 from backend.app.services.demo_session_service import (
     DemoSessionServiceError,
@@ -215,6 +222,122 @@ def create_demo_booking(
     return BookingRead.model_validate(
         result.booking
     )
+
+
+@router.post(
+    "/bookings/batch",
+    response_model=DemoBookingBatchRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Atomically book 1–5 selected demo seats",
+    responses={
+        status.HTTP_404_NOT_FOUND: {
+            "model": BookingErrorResponse,
+        },
+        status.HTTP_409_CONFLICT: {
+            "model": BookingErrorResponse,
+        },
+        status.HTTP_422_UNPROCESSABLE_CONTENT: {
+            "model": BookingErrorResponse,
+        },
+        status.HTTP_503_SERVICE_UNAVAILABLE: {
+            "model": BookingErrorResponse,
+        },
+    },
+)
+def create_demo_batch_booking(
+    request_body: DemoBookingBatchCreate,
+    response: Response,
+    session: DatabaseSession,
+    idempotency_key: IdempotencyKey,
+) -> DemoBookingBatchRead:
+    """Book every selected seat in one transaction."""
+
+    active_experiment = session.scalar(
+        select(ExperimentRun)
+        .where(
+            ExperimentRun.show_id
+            == request_body.show_id,
+            ExperimentRun.status
+            == ExperimentStatus.RUNNING,
+        )
+        .order_by(
+            ExperimentRun.started_at.desc(),
+            ExperimentRun.id.desc(),
+        )
+        .limit(1)
+    )
+
+    if active_experiment is not None:
+        demo_session = session.scalar(
+            select(DemoSession)
+            .where(
+                DemoSession.experiment_run_id
+                == active_experiment.id,
+                DemoSession.status
+                == DemoSessionStatus.RUNNING,
+            )
+            .limit(1)
+        )
+
+        if (
+            demo_session is None
+            or set(
+                demo_session.selected_seat_ids
+            ) != set(request_body.seat_ids)
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "DEMO_SELECTION_MISMATCH",
+                    "message": (
+                        "The requested seats do not match "
+                        "the active browser selection."
+                    ),
+                },
+            )
+
+    command = BatchBookingCommand(
+        batch_idempotency_key=idempotency_key,
+        user_id=request_body.user_id,
+        show_id=request_body.show_id,
+        seat_ids=tuple(request_body.seat_ids),
+        experiment_run_id=(
+            active_experiment.id
+            if active_experiment is not None
+            else None
+        ),
+    )
+
+    try:
+        result = create_bookings_atomically(
+            session,
+            command,
+        )
+    except BookingServiceError as error:
+        raise HTTPException(
+            status_code=error.status_code,
+            detail={
+                "code": error.code,
+                "message": error.message,
+            },
+        ) from error
+
+    if result.replayed:
+        response.status_code = status.HTTP_200_OK
+        response.headers[
+            "Idempotent-Replayed"
+        ] = "true"
+    else:
+        response.status_code = status.HTTP_201_CREATED
+
+    return DemoBookingBatchRead(
+        bookings=[
+            BookingRead.model_validate(booking)
+            for booking in result.bookings
+        ],
+        replayed=result.replayed,
+    )
+
 
 
 @router.get(

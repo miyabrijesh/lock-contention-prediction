@@ -684,3 +684,216 @@ def test_expired_demo_session_is_hidden(
     assert updated_session.status == (
         DemoSessionStatus.CANCELLED
     )
+
+
+def _available_normal_seats(
+    session: Session,
+    *,
+    count: int,
+) -> tuple[Show, SyntheticUser, list[Seat]]:
+    """Return available seats from the normal demonstration show."""
+
+    user = session.scalar(
+        select(SyntheticUser)
+        .order_by(SyntheticUser.id)
+        .limit(1)
+    )
+
+    show = session.scalar(
+        select(Show)
+        .where(
+            Show.is_experiment_show.is_(False)
+        )
+        .order_by(Show.id)
+        .limit(1)
+    )
+
+    assert user is not None
+    assert show is not None
+
+    seats = list(
+        session.scalars(
+            select(Seat)
+            .where(
+                Seat.show_id == show.id,
+                Seat.state == SeatState.AVAILABLE,
+            )
+            .order_by(Seat.id)
+            .limit(count)
+        ).all()
+    )
+
+    assert len(seats) == count
+
+    return show, user, seats
+
+
+def test_demo_batch_booking_is_atomic(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """Book all requested seats in one successful transaction."""
+
+    show, user, seats = _available_normal_seats(
+        db_session,
+        count=3,
+    )
+    seat_ids = [
+        seat.id
+        for seat in seats
+    ]
+
+    response = client.post(
+        "/api/v1/demo/bookings/batch",
+        headers={
+            "Idempotency-Key": str(uuid4()),
+        },
+        json={
+            "userId": user.id,
+            "showId": show.id,
+            "seatIds": seat_ids,
+        },
+    )
+
+    assert response.status_code == 201, response.json()
+
+    body = response.json()
+
+    assert body["replayed"] is False
+    assert len(body["bookings"]) == 3
+    assert {
+        booking["seat_id"]
+        for booking in body["bookings"]
+    } == set(seat_ids)
+    assert all(
+        booking["status"] == "CONFIRMED"
+        for booking in body["bookings"]
+    )
+
+    db_session.expire_all()
+
+    updated_seats = list(
+        db_session.scalars(
+            select(Seat)
+            .where(
+                Seat.id.in_(seat_ids)
+            )
+            .order_by(Seat.id)
+        ).all()
+    )
+
+    assert all(
+        seat.state == SeatState.BOOKED
+        for seat in updated_seats
+    )
+
+
+def test_demo_batch_booking_replays_idempotently(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """Replay one batch without creating duplicate bookings."""
+
+    show, user, seats = _available_normal_seats(
+        db_session,
+        count=2,
+    )
+    batch_key = str(uuid4())
+    payload = {
+        "userId": user.id,
+        "showId": show.id,
+        "seatIds": [
+            seat.id
+            for seat in seats
+        ],
+    }
+
+    first_response = client.post(
+        "/api/v1/demo/bookings/batch",
+        headers={
+            "Idempotency-Key": batch_key,
+        },
+        json=payload,
+    )
+    replay_response = client.post(
+        "/api/v1/demo/bookings/batch",
+        headers={
+            "Idempotency-Key": batch_key,
+        },
+        json=payload,
+    )
+
+    assert first_response.status_code == 201
+    assert replay_response.status_code == 200
+    assert (
+        replay_response.headers[
+            "Idempotent-Replayed"
+        ]
+        == "true"
+    )
+    assert replay_response.json()["replayed"] is True
+    assert {
+        booking["id"]
+        for booking in first_response.json()["bookings"]
+    } == {
+        booking["id"]
+        for booking in replay_response.json()["bookings"]
+    }
+
+
+def test_demo_batch_booking_rolls_back_every_seat(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """Leave every available seat untouched if one seat fails."""
+
+    show, user, seats = _available_normal_seats(
+        db_session,
+        count=3,
+    )
+    seat_ids = [
+        seat.id
+        for seat in seats
+    ]
+
+    seats[1].state = SeatState.BOOKED
+    db_session.commit()
+
+    response = client.post(
+        "/api/v1/demo/bookings/batch",
+        headers={
+            "Idempotency-Key": str(uuid4()),
+        },
+        json={
+            "userId": user.id,
+            "showId": show.id,
+            "seatIds": seat_ids,
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == (
+        "SEAT_UNAVAILABLE"
+    )
+
+    db_session.expire_all()
+
+    updated_seats = {
+        seat.id: seat
+        for seat in db_session.scalars(
+            select(Seat)
+            .where(
+                Seat.id.in_(seat_ids)
+            )
+        ).all()
+    }
+
+    assert updated_seats[seat_ids[0]].state == (
+        SeatState.AVAILABLE
+    )
+    assert updated_seats[seat_ids[1]].state == (
+        SeatState.BOOKED
+    )
+    assert updated_seats[seat_ids[2]].state == (
+        SeatState.AVAILABLE
+    )

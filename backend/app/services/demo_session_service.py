@@ -10,11 +10,13 @@ from sqlalchemy.orm import Session
 
 from backend.app.models import (
     DemoSession,
+    ExperimentRun,
     Seat,
 )
 from backend.app.models.enums import (
     DemoScenarioName,
     DemoSessionStatus,
+    ExperimentStatus,
     SeatState,
 )
 from backend.app.repositories.demo_session_repository import (
@@ -465,7 +467,7 @@ def submit_demo_seat_selection(
             and set(
                 demo_session.selected_seat_ids
             )
-            ==set(seat_ids)
+            == set(seat_ids)
         ):
             return demo_session
 
@@ -527,6 +529,201 @@ def submit_demo_seat_selection(
         if session.in_transaction():
             session.rollback()
 
+        raise
+
+    except SQLAlchemyError as error:
+        session.rollback()
+        raise _database_error() from error
+
+
+def start_demo_session(
+    session: Session,
+    *,
+    demo_session_id: UUID,
+    experiment_run_id: UUID,
+) -> DemoSession:
+    """Link a prepared experiment and mark the demo running."""
+
+    try:
+        demo_session = get_demo_session_for_update(
+            session,
+            demo_session_id,
+        )
+
+        if demo_session is None:
+            raise DemoSessionServiceError(
+                code="DEMO_SESSION_NOT_FOUND",
+                message=(
+                    "The requested demo session "
+                    "was not found."
+                ),
+                status_code=404,
+            )
+
+        if (
+            demo_session.status
+            == DemoSessionStatus.RUNNING
+            and demo_session.experiment_run_id
+            == experiment_run_id
+        ):
+            return demo_session
+
+        if demo_session.status != DemoSessionStatus.READY:
+            raise DemoSessionServiceError(
+                code="DEMO_SESSION_NOT_READY",
+                message=(
+                    "The demo session is not ready "
+                    "to start."
+                ),
+                status_code=409,
+            )
+
+        experiment = session.get(
+            ExperimentRun,
+            experiment_run_id,
+        )
+
+        if experiment is None:
+            raise DemoSessionServiceError(
+                code="DEMO_EXPERIMENT_NOT_FOUND",
+                message=(
+                    "The prepared demo experiment "
+                    "was not found."
+                ),
+                status_code=404,
+            )
+
+        if experiment.status != ExperimentStatus.DRAFT:
+            raise DemoSessionServiceError(
+                code="DEMO_EXPERIMENT_NOT_DRAFT",
+                message=(
+                    "The prepared demo experiment "
+                    "must be in DRAFT state."
+                ),
+                status_code=409,
+            )
+
+        if experiment.show_id != demo_session.show_id:
+            raise DemoSessionServiceError(
+                code="DEMO_EXPERIMENT_SHOW_MISMATCH",
+                message=(
+                    "The demo experiment uses the "
+                    "wrong show."
+                ),
+                status_code=409,
+            )
+
+        if set(
+            experiment.hotspot_seat_ids
+        ) != set(
+            demo_session.selected_seat_ids
+        ):
+            raise DemoSessionServiceError(
+                code="DEMO_EXPERIMENT_SEAT_MISMATCH",
+                message=(
+                    "The demo experiment hotspots "
+                    "do not match the browser selection."
+                ),
+                status_code=409,
+            )
+
+        demo_session.experiment_run_id = (
+            experiment_run_id
+        )
+        demo_session.status = (
+            DemoSessionStatus.RUNNING
+        )
+
+        session.commit()
+        session.refresh(demo_session)
+
+        return demo_session
+
+    except DemoSessionServiceError:
+        session.rollback()
+        raise
+
+    except SQLAlchemyError as error:
+        session.rollback()
+        raise _database_error() from error
+
+
+def finish_demo_session(
+    session: Session,
+    *,
+    demo_session_id: UUID,
+    final_status: DemoSessionStatus,
+) -> DemoSession:
+    """Apply one terminal state to a demo session."""
+
+    terminal_statuses = {
+        DemoSessionStatus.COMPLETED,
+        DemoSessionStatus.FAILED,
+        DemoSessionStatus.CANCELLED,
+    }
+
+    if final_status not in terminal_statuses:
+        raise DemoSessionServiceError(
+            code="DEMO_SESSION_FINAL_STATUS_INVALID",
+            message=(
+                "The requested demo-session final "
+                "status is invalid."
+            ),
+            status_code=422,
+        )
+
+    try:
+        demo_session = get_demo_session_for_update(
+            session,
+            demo_session_id,
+        )
+
+        if demo_session is None:
+            raise DemoSessionServiceError(
+                code="DEMO_SESSION_NOT_FOUND",
+                message=(
+                    "The requested demo session "
+                    "was not found."
+                ),
+                status_code=404,
+            )
+
+        if demo_session.status == final_status:
+            return demo_session
+
+        if (
+            final_status == DemoSessionStatus.COMPLETED
+            and demo_session.status
+            != DemoSessionStatus.RUNNING
+        ):
+            raise DemoSessionServiceError(
+                code="DEMO_SESSION_NOT_RUNNING",
+                message=(
+                    "Only a running demo session "
+                    "can be completed."
+                ),
+                status_code=409,
+            )
+
+        if demo_session.status in terminal_statuses:
+            raise DemoSessionServiceError(
+                code="DEMO_SESSION_ALREADY_FINISHED",
+                message=(
+                    "The demo session already has "
+                    "a terminal status."
+                ),
+                status_code=409,
+            )
+
+        demo_session.status = final_status
+
+        session.commit()
+        session.refresh(demo_session)
+
+        return demo_session
+
+    except DemoSessionServiceError:
+        session.rollback()
         raise
 
     except SQLAlchemyError as error:

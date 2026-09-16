@@ -3,6 +3,8 @@ import type {
     ApiErrorBody,
     Booking,
     ContentionStatus,
+    DemoBookingBatchResponse,
+    DemoSession,
     Seat,
     Show,
 } from '../types'
@@ -151,6 +153,59 @@ export async function createDemoBookings(
     }
 
     return bookings
+}
+
+
+export function getDemoSession(
+    showId: number,
+): Promise<DemoSession> {
+    const query = new URLSearchParams({
+        show_id: String(showId),
+    })
+
+    return request<DemoSession>(
+        `/api/v1/demo/session?${query}`,
+    )
+}
+
+export function submitDemoSeatSelection(
+    sessionId: string,
+    seatIds: number[],
+): Promise<DemoSession> {
+    return request<DemoSession>(
+        `/api/v1/demo/sessions/${sessionId}/selection`,
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                seatIds,
+            }),
+        },
+    )
+}
+
+interface CreateDemoBatchBookingRequest {
+    userId: number
+    showId: number
+    seatIds: number[]
+}
+
+export function createDemoBatchBooking(
+    payload: CreateDemoBatchBookingRequest,
+): Promise<DemoBookingBatchResponse> {
+    return request<DemoBookingBatchResponse>(
+        '/api/v1/demo/bookings/batch',
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Idempotency-Key': crypto.randomUUID(),
+            },
+            body: JSON.stringify(payload),
+        },
+    )
 }
 
 export function getActiveExperiment(

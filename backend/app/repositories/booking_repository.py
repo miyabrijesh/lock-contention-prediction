@@ -74,6 +74,30 @@ def get_seat_for_update(
     return session.scalar(statement)
 
 
+
+def get_seats_for_update(
+    session: Session,
+    seat_ids: list[int],
+) -> list[Seat]:
+    """Lock selected seats in deterministic database-ID order."""
+
+    if not seat_ids:
+        return []
+
+    statement = (
+        select(Seat)
+        .where(
+            Seat.id.in_(seat_ids)
+        )
+        .order_by(Seat.id)
+        .with_for_update()
+    )
+
+    return list(
+        session.scalars(statement).all()
+    )
+
+
 def add_booking_attempt(
     session: Session,
     *,

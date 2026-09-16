@@ -95,6 +95,36 @@ export interface ContentionStatus {
     requestsPerSecond: number | null
     p95LatencyMs: number | null
 }
+
+export type DemoSessionStatus =
+    | 'WAITING_FOR_SELECTION'
+    | 'READY'
+    | 'RUNNING'
+    | 'COMPLETED'
+    | 'FAILED'
+    | 'CANCELLED'
+
+export type DemoScenario =
+    | 'BASELINE'
+    | 'CONTENTION'
+
+export interface DemoSession {
+    available: boolean
+    sessionId: string | null
+    showId: number | null
+    status: DemoSessionStatus | null
+    scenario: DemoScenario | null
+    selectedSeatIds: number[]
+    experimentRunId: string | null
+    expiresAt: string | null
+    selectionSubmittedAt: string | null
+}
+
+export interface DemoBookingBatchResponse {
+    bookings: Booking[]
+    replayed: boolean
+}
+
 export interface ActiveExperiment {
     active: boolean
     experimentRunId: string | null
