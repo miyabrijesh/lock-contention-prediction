@@ -52,6 +52,13 @@ telemetry.
 Detailed instructions are available in
 [`docs/demo/interactive_browser_demo.md`](docs/demo/interactive_browser_demo.md).
 
+## Frontend interface
+
+The React frontend provides the cinema-style booking workflow used during the
+interactive lock-contention demonstration.
+
+![Interactive cinema seat-selection interface](docs/images/frontend-seat-selection.png)
+
 ## Verified demonstration behavior
 
 The final automatic acceptance run selected the contention scenario and used
