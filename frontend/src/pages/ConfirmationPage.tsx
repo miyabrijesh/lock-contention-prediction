@@ -65,7 +65,7 @@ export function ConfirmationPage() {
                             The Last Signal
                         </h1>
                         <p>
-                            Your demonstration seat has been reserved
+                            Your demonstration booking has been recorded
                             in the booking database.
                         </p>
                     </div>
@@ -122,10 +122,10 @@ export function ConfirmationPage() {
                         Transaction result
                     </p>
                     <p>
-                        The seat state was changed through the
+                        The booking was completed through the
                         transactional FastAPI booking service.
-                        Competing requests for this seat will now
-                        receive a conflict response.
+                        Any competing request for a reserved seat
+                        will now receive a conflict response.
                     </p>
                 </div>
 

@@ -882,10 +882,12 @@ export function ShowPage() {
                                                 disabled={
                                                     seat.state
                                                     !== 'AVAILABLE'
-                                                    || (
-                                                        selectionLocked
-                                                        && !selected
-                                                    )
+                                                    || bookingState
+                                                    === 'loading'
+                                                }
+                                                aria-disabled={
+                                                    selectionLocked
+                                                    && !selected
                                                 }
                                                 aria-pressed={selected}
                                                 aria-label={
