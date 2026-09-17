@@ -59,6 +59,20 @@ interactive lock-contention demonstration.
 
 ![Interactive cinema seat-selection interface](docs/images/frontend-seat-selection.png)
 
+### Live contention prediction
+
+The system-status view displays the latest persisted model prediction together
+with the telemetry used to interpret the current workload.
+
+![Live HIGH contention-risk prediction](docs/images/frontend-live-high.png)
+
+### Atomic booking confirmation
+
+The selected seats are confirmed together through the transactional batch
+booking service.
+
+![Multi-seat booking confirmation](docs/images/frontend-booking-confirmation.png)
+
 ## Verified demonstration behavior
 
 The final automatic acceptance run selected the contention scenario and used
