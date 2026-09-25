@@ -1,0 +1,186 @@
+{
+  "analysis_name": "phase_8a_specificity_root_cause",
+  "interpretation_boundary": {
+    "model_retrained": false,
+    "phase_8a_used_to_change_active_model": false,
+    "purpose": "Post-hoc diagnosis of the active model's specificity degradation under a new workload.",
+    "threshold_retuned": false
+  },
+  "largest_feature_distribution_shifts": [
+    {
+      "absolute_standardized_mean_difference": 4.805308196752705,
+      "feature": "configured_users",
+      "original_mean": 13.007501875468867,
+      "phase_8a_mean": 30.0,
+      "standardized_mean_difference": 4.805308196752705
+    },
+    {
+      "absolute_standardized_mean_difference": 1.3415243807376263,
+      "feature": "active_users",
+      "original_mean": 8.096399099774944,
+      "phase_8a_mean": 17.308157099697887,
+      "standardized_mean_difference": 1.3415243807376263
+    },
+    {
+      "absolute_standardized_mean_difference": 1.1362076125561853,
+      "feature": "active_transactions",
+      "original_mean": 6.004876219054764,
+      "phase_8a_mean": 8.945619335347432,
+      "standardized_mean_difference": 1.1362076125561853
+    },
+    {
+      "absolute_standardized_mean_difference": 1.1312485438283595,
+      "feature": "connection_utilization",
+      "original_mean": 0.08643285821455364,
+      "phase_8a_mean": 0.11250755287009064,
+      "standardized_mean_difference": 1.1312485438283595
+    },
+    {
+      "absolute_standardized_mean_difference": 1.131248543828359,
+      "feature": "total_connections",
+      "original_mean": 8.643285821455365,
+      "phase_8a_mean": 11.250755287009063,
+      "standardized_mean_difference": 1.131248543828359
+    },
+    {
+      "absolute_standardized_mean_difference": 1.074323012512184,
+      "feature": "total_locks",
+      "original_mean": 135.7948237059265,
+      "phase_8a_mean": 202.20694864048338,
+      "standardized_mean_difference": 1.074323012512184
+    },
+    {
+      "absolute_standardized_mean_difference": 0.7944541491152816,
+      "feature": "p95_latency_ms",
+      "original_mean": 462.1712580645161,
+      "phase_8a_mean": 788.4209486404834,
+      "standardized_mean_difference": 0.7944541491152816
+    },
+    {
+      "absolute_standardized_mean_difference": 0.6490476988215499,
+      "feature": "mean_latency_ms",
+      "original_mean": 296.7251009002251,
+      "phase_8a_mean": 457.4713111782478,
+      "standardized_mean_difference": 0.6490476988215499
+    }
+  ],
+  "model": {
+    "classification_threshold": 0.34,
+    "model_file": "/Users/miyakalliyath/Documents/lock-contention-prediction/artifacts/models/contention_candidate_v1.joblib",
+    "model_name": "logistic_regression"
+  },
+  "outcomes_by_demand_profile": {
+    "HIGH": {
+      "false_negative": 0,
+      "false_positive": 0,
+      "negative_label_count": 0,
+      "positive_label_count": 221,
+      "row_count": 221,
+      "specificity": null,
+      "true_negative": 0,
+      "true_positive": 221
+    },
+    "LOW": {
+      "false_negative": 1,
+      "false_positive": 105,
+      "negative_label_count": 112,
+      "positive_label_count": 109,
+      "row_count": 221,
+      "specificity": 0.0625,
+      "true_negative": 7,
+      "true_positive": 108
+    },
+    "MEDIUM": {
+      "false_negative": 0,
+      "false_positive": 5,
+      "negative_label_count": 5,
+      "positive_label_count": 215,
+      "row_count": 220,
+      "specificity": 0.0,
+      "true_negative": 0,
+      "true_positive": 215
+    }
+  },
+  "outcomes_by_traffic_pattern": {
+    "BURST": {
+      "false_negative": 0,
+      "false_positive": 30,
+      "negative_label_count": 30,
+      "positive_label_count": 104,
+      "row_count": 134,
+      "specificity": 0.0,
+      "true_negative": 0,
+      "true_positive": 104
+    },
+    "COOLDOWN": {
+      "false_negative": 0,
+      "false_positive": 27,
+      "negative_label_count": 27,
+      "positive_label_count": 105,
+      "row_count": 132,
+      "specificity": 0.0,
+      "true_negative": 0,
+      "true_positive": 105
+    },
+    "FLASH_SALE": {
+      "false_negative": 0,
+      "false_positive": 20,
+      "negative_label_count": 25,
+      "positive_label_count": 107,
+      "row_count": 132,
+      "specificity": 0.2,
+      "true_negative": 5,
+      "true_positive": 107
+    },
+    "RAMP": {
+      "false_negative": 0,
+      "false_positive": 17,
+      "negative_label_count": 18,
+      "positive_label_count": 115,
+      "row_count": 133,
+      "specificity": 0.05555555555555555,
+      "true_negative": 1,
+      "true_positive": 115
+    },
+    "STEADY": {
+      "false_negative": 1,
+      "false_positive": 16,
+      "negative_label_count": 17,
+      "positive_label_count": 114,
+      "row_count": 131,
+      "specificity": 0.058823529411764705,
+      "true_negative": 1,
+      "true_positive": 113
+    }
+  },
+  "overall_confusion_matrix": {
+    "false_negative": 1,
+    "false_positive": 110,
+    "negative_label_count": 117,
+    "positive_label_count": 545,
+    "row_count": 662,
+    "specificity": 0.05982905982905983,
+    "true_negative": 7,
+    "true_positive": 544
+  },
+  "phase_8a_dataset": {
+    "configured_users": [
+      30
+    ],
+    "experiment_count": 15,
+    "row_count": 662,
+    "simulated_work_ms": [
+      150
+    ]
+  },
+  "probability_distribution": {
+    "actual_negative_fraction_above_threshold": 0.9401709401709402,
+    "actual_negative_maximum": 0.9969762943738676,
+    "actual_negative_mean": 0.6735872857632484,
+    "actual_negative_median": 0.7219341402840551,
+    "actual_negative_minimum": 0.1275705478032881,
+    "actual_positive_mean": 0.9509446620081246,
+    "actual_positive_median": 0.9935590272528043
+  },
+  "schema_version": "1.0.0"
+}
