@@ -1,0 +1,55 @@
+{
+  "analysis_name": "stratified_bootstrap_test_metrics",
+  "confidence_intervals_95": {
+    "accuracy": {
+      "lower": 0.8208955223880597,
+      "upper": 0.8855721393034826
+    },
+    "average_precision": {
+      "lower": 0.9736870721064105,
+      "upper": 0.9897889926178959
+    },
+    "precision": {
+      "lower": 0.7777777777777778,
+      "upper": 0.8467228183898027
+    },
+    "recall": {
+      "lower": 0.9529914529914529,
+      "upper": 0.9914529914529915
+    }
+  },
+  "dataset": {
+    "assignment_sha256": "4a24f55d3d1121f50da74ae3ec21cfba4a6f3f9044069edff7113d228c4c8374",
+    "experiment_count": 9,
+    "negative_label_count": 168,
+    "positive_label_count": 234,
+    "row_count": 402,
+    "split": "test"
+  },
+  "interpretation_boundary": {
+    "intervals_describe_current_frozen_dataset": true,
+    "model_retrained": false,
+    "test_split_used_for_model_selection": false,
+    "threshold_retuned": false
+  },
+  "method": {
+    "bootstrap_samples": 10000,
+    "confidence_level": 0.95,
+    "interval_method": "percentile",
+    "random_seed": 20260925,
+    "resampling_method": "stratified_bootstrap"
+  },
+  "model": {
+    "classification_threshold": 0.34,
+    "model_file": "/Users/miyakalliyath/Documents/lock-contention-prediction/artifacts/models/contention_candidate_v1.joblib",
+    "model_name": "logistic_regression"
+  },
+  "point_estimates": {
+    "accuracy": 0.8532338308457711,
+    "average_precision": 0.982184729811235,
+    "precision": 0.8113879003558719,
+    "recall": 0.9743589743589743
+  },
+  "purpose": "Quantify uncertainty around the already frozen test-set results without retraining, threshold tuning, or model selection.",
+  "schema_version": "1.0.0"
+}
