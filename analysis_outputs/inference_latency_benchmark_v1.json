@@ -1,0 +1,35 @@
+{
+  "analysis_name": "local_model_inference_latency",
+  "benchmark": {
+    "includes_database_query": false,
+    "includes_feature_collection_time": false,
+    "includes_http_network_time": false,
+    "input_source": "validation feature rows only",
+    "input_type": "one telemetry row",
+    "latency_unit": "milliseconds",
+    "measured_iterations": 5000,
+    "warmup_iterations": 500
+  },
+  "environment": {
+    "platform": "macOS-27.0-arm64-arm-64bit",
+    "python_version": "3.11.16"
+  },
+  "interpretation_boundary": {
+    "model_or_threshold_changed": false,
+    "result_scope": "Local model scoring only; not end-to-end production request latency."
+  },
+  "latency_ms": {
+    "maximum": 1.069625,
+    "mean": 0.2225059848,
+    "median_p50": 0.221167,
+    "minimum": 0.2115,
+    "p95": 0.22829105,
+    "p99": 0.24562667000000005
+  },
+  "model": {
+    "feature_count": 18,
+    "model_file": "/Users/miyakalliyath/Documents/lock-contention-prediction/artifacts/models/contention_candidate_v1.joblib",
+    "model_name": "logistic_regression"
+  },
+  "schema_version": "1.0.0"
+}
