@@ -398,7 +398,20 @@ def create_interactive_experiment(
             "The experiment uses the wrong show."
         )
 
-    if set(hotspot_seat_ids or []) != set(seat_ids):
+    if not isinstance(hotspot_seat_ids, list):
+        raise InteractiveDemoError(
+            "The experiment has no valid hotspot-seat list."
+        )
+
+    try:
+        actual_hotspot_seat_ids = {int(value) for value in hotspot_seat_ids}
+        expected_hotspot_seat_ids = {int(value) for value in seat_ids}
+    except (TypeError, ValueError) as exc:
+        raise InteractiveDemoError(
+            "The experiment contains invalid hotspot-seat IDs."
+        ) from exc
+
+    if actual_hotspot_seat_ids != expected_hotspot_seat_ids:
         raise InteractiveDemoError(
             "The experiment uses the wrong hotspot seats."
         )
