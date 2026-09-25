@@ -1,0 +1,1097 @@
+{
+  "analysis_name": "leakage_safe_feature_ablation",
+  "dataset": {
+    "candidate_feature_count": 18,
+    "excluded_split": "test",
+    "experiment_count": 51,
+    "included_splits": [
+      "train",
+      "validation"
+    ],
+    "row_count": 2264,
+    "target_column": "future_high_contention_30s"
+  },
+  "feature_ranking": [
+    {
+      "feature": "hotspot_ratio",
+      "mean_rank": 1.0,
+      "top_k_selection_count": {
+        "3": 25,
+        "6": 25,
+        "9": 25,
+        "12": 25,
+        "18": 25
+      }
+    },
+    {
+      "feature": "estimated_wait_age_ms",
+      "mean_rank": 3.84,
+      "top_k_selection_count": {
+        "3": 13,
+        "6": 23,
+        "9": 25,
+        "12": 25,
+        "18": 25
+      }
+    },
+    {
+      "feature": "configured_users",
+      "mean_rank": 4.28,
+      "top_k_selection_count": {
+        "3": 12,
+        "6": 21,
+        "9": 25,
+        "12": 25,
+        "18": 25
+      }
+    },
+    {
+      "feature": "active_transactions",
+      "mean_rank": 5.88,
+      "top_k_selection_count": {
+        "3": 4,
+        "6": 16,
+        "9": 23,
+        "12": 25,
+        "18": 25
+      }
+    },
+    {
+      "feature": "requests_per_sec",
+      "mean_rank": 5.96,
+      "top_k_selection_count": {
+        "3": 4,
+        "6": 14,
+        "9": 23,
+        "12": 25,
+        "18": 25
+      }
+    },
+    {
+      "feature": "p95_latency_ms",
+      "mean_rank": 6.36,
+      "top_k_selection_count": {
+        "3": 8,
+        "6": 12,
+        "9": 20,
+        "12": 25,
+        "18": 25
+      }
+    },
+    {
+      "feature": "blocked_sessions",
+      "mean_rank": 6.48,
+      "top_k_selection_count": {
+        "3": 6,
+        "6": 11,
+        "9": 22,
+        "12": 25,
+        "18": 25
+      }
+    },
+    {
+      "feature": "total_locks",
+      "mean_rank": 6.84,
+      "top_k_selection_count": {
+        "3": 1,
+        "6": 12,
+        "9": 22,
+        "12": 25,
+        "18": 25
+      }
+    },
+    {
+      "feature": "mean_latency_ms",
+      "mean_rank": 8.16,
+      "top_k_selection_count": {
+        "3": 2,
+        "6": 11,
+        "9": 15,
+        "12": 19,
+        "18": 25
+      }
+    },
+    {
+      "feature": "total_connections",
+      "mean_rank": 10.2,
+      "top_k_selection_count": {
+        "3": 0,
+        "6": 0,
+        "9": 6,
+        "12": 25,
+        "18": 25
+      }
+    },
+    {
+      "feature": "waiting_locks",
+      "mean_rank": 10.4,
+      "top_k_selection_count": {
+        "3": 0,
+        "6": 3,
+        "9": 11,
+        "12": 14,
+        "18": 25
+      }
+    },
+    {
+      "feature": "active_users",
+      "mean_rank": 10.72,
+      "top_k_selection_count": {
+        "3": 0,
+        "6": 2,
+        "9": 5,
+        "12": 20,
+        "18": 25
+      }
+    },
+    {
+      "feature": "connection_utilization",
+      "mean_rank": 10.88,
+      "top_k_selection_count": {
+        "3": 0,
+        "6": 0,
+        "9": 3,
+        "12": 22,
+        "18": 25
+      }
+    },
+    {
+      "feature": "deadlock_delta",
+      "mean_rank": 14.0,
+      "top_k_selection_count": {
+        "3": 0,
+        "6": 0,
+        "9": 0,
+        "12": 0,
+        "18": 25
+      }
+    },
+    {
+      "feature": "failure_rate",
+      "mean_rank": 15.0,
+      "top_k_selection_count": {
+        "3": 0,
+        "6": 0,
+        "9": 0,
+        "12": 0,
+        "18": 25
+      }
+    },
+    {
+      "feature": "booking_success_rate",
+      "mean_rank": 16.0,
+      "top_k_selection_count": {
+        "3": 0,
+        "6": 0,
+        "9": 0,
+        "12": 0,
+        "18": 25
+      }
+    },
+    {
+      "feature": "conflict_rate",
+      "mean_rank": 17.0,
+      "top_k_selection_count": {
+        "3": 0,
+        "6": 0,
+        "9": 0,
+        "12": 0,
+        "18": 25
+      }
+    },
+    {
+      "feature": "timeout_rate",
+      "mean_rank": 18.0,
+      "top_k_selection_count": {
+        "3": 0,
+        "6": 0,
+        "9": 0,
+        "12": 0,
+        "18": 25
+      }
+    }
+  ],
+  "fold_results": [
+    {
+      "evaluation_experiment_count": 10,
+      "fit_experiment_count": 41,
+      "fold": 1,
+      "ranked_features": [
+        "hotspot_ratio",
+        "blocked_sessions",
+        "active_transactions",
+        "estimated_wait_age_ms",
+        "configured_users",
+        "total_locks",
+        "requests_per_sec",
+        "p95_latency_ms",
+        "active_users",
+        "mean_latency_ms",
+        "connection_utilization",
+        "total_connections",
+        "waiting_locks",
+        "deadlock_delta",
+        "failure_rate",
+        "booking_success_rate",
+        "conflict_rate",
+        "timeout_rate"
+      ],
+      "repeat": 1,
+      "top_k_pr_auc": {
+        "12": 0.954063428731788,
+        "18": 0.9539865153209753,
+        "3": 0.9468933950879201,
+        "6": 0.9484062415149359,
+        "9": 0.9537696442403109
+      }
+    },
+    {
+      "evaluation_experiment_count": 10,
+      "fit_experiment_count": 41,
+      "fold": 2,
+      "ranked_features": [
+        "hotspot_ratio",
+        "mean_latency_ms",
+        "total_locks",
+        "active_transactions",
+        "waiting_locks",
+        "estimated_wait_age_ms",
+        "configured_users",
+        "blocked_sessions",
+        "total_connections",
+        "connection_utilization",
+        "requests_per_sec",
+        "p95_latency_ms",
+        "active_users",
+        "deadlock_delta",
+        "failure_rate",
+        "booking_success_rate",
+        "conflict_rate",
+        "timeout_rate"
+      ],
+      "repeat": 1,
+      "top_k_pr_auc": {
+        "12": 0.9281211823243312,
+        "18": 0.9272218765779645,
+        "3": 0.9162156481131316,
+        "6": 0.921322938578641,
+        "9": 0.9253848325478367
+      }
+    },
+    {
+      "evaluation_experiment_count": 10,
+      "fit_experiment_count": 41,
+      "fold": 3,
+      "ranked_features": [
+        "hotspot_ratio",
+        "requests_per_sec",
+        "configured_users",
+        "estimated_wait_age_ms",
+        "active_transactions",
+        "blocked_sessions",
+        "mean_latency_ms",
+        "p95_latency_ms",
+        "total_locks",
+        "total_connections",
+        "connection_utilization",
+        "active_users",
+        "waiting_locks",
+        "deadlock_delta",
+        "failure_rate",
+        "booking_success_rate",
+        "conflict_rate",
+        "timeout_rate"
+      ],
+      "repeat": 1,
+      "top_k_pr_auc": {
+        "12": 0.9620001222860146,
+        "18": 0.9618185865803054,
+        "3": 0.9402217435285307,
+        "6": 0.9621248071007157,
+        "9": 0.9610559242236085
+      }
+    },
+    {
+      "evaluation_experiment_count": 11,
+      "fit_experiment_count": 40,
+      "fold": 4,
+      "ranked_features": [
+        "hotspot_ratio",
+        "configured_users",
+        "estimated_wait_age_ms",
+        "active_users",
+        "p95_latency_ms",
+        "blocked_sessions",
+        "total_connections",
+        "connection_utilization",
+        "total_locks",
+        "active_transactions",
+        "requests_per_sec",
+        "mean_latency_ms",
+        "waiting_locks",
+        "deadlock_delta",
+        "failure_rate",
+        "booking_success_rate",
+        "conflict_rate",
+        "timeout_rate"
+      ],
+      "repeat": 1,
+      "top_k_pr_auc": {
+        "12": 0.9289752177277519,
+        "18": 0.9288444193966545,
+        "3": 0.9101570779905955,
+        "6": 0.9343636300806356,
+        "9": 0.921667619550634
+      }
+    },
+    {
+      "evaluation_experiment_count": 10,
+      "fit_experiment_count": 41,
+      "fold": 5,
+      "ranked_features": [
+        "hotspot_ratio",
+        "p95_latency_ms",
+        "estimated_wait_age_ms",
+        "requests_per_sec",
+        "configured_users",
+        "mean_latency_ms",
+        "active_transactions",
+        "total_locks",
+        "waiting_locks",
+        "blocked_sessions",
+        "active_users",
+        "total_connections",
+        "connection_utilization",
+        "deadlock_delta",
+        "failure_rate",
+        "booking_success_rate",
+        "conflict_rate",
+        "timeout_rate"
+      ],
+      "repeat": 1,
+      "top_k_pr_auc": {
+        "12": 0.9133335600116654,
+        "18": 0.9133995128115124,
+        "3": 0.9022915962905322,
+        "6": 0.9092962573938996,
+        "9": 0.9122917141141151
+      }
+    },
+    {
+      "evaluation_experiment_count": 10,
+      "fit_experiment_count": 41,
+      "fold": 1,
+      "ranked_features": [
+        "hotspot_ratio",
+        "blocked_sessions",
+        "active_transactions",
+        "total_locks",
+        "configured_users",
+        "estimated_wait_age_ms",
+        "p95_latency_ms",
+        "requests_per_sec",
+        "mean_latency_ms",
+        "total_connections",
+        "connection_utilization",
+        "active_users",
+        "waiting_locks",
+        "deadlock_delta",
+        "failure_rate",
+        "booking_success_rate",
+        "conflict_rate",
+        "timeout_rate"
+      ],
+      "repeat": 2,
+      "top_k_pr_auc": {
+        "12": 0.941891069476629,
+        "18": 0.941816570435479,
+        "3": 0.9332974785373331,
+        "6": 0.9355697840216399,
+        "9": 0.9422859479603158
+      }
+    },
+    {
+      "evaluation_experiment_count": 10,
+      "fit_experiment_count": 41,
+      "fold": 2,
+      "ranked_features": [
+        "hotspot_ratio",
+        "estimated_wait_age_ms",
+        "configured_users",
+        "p95_latency_ms",
+        "requests_per_sec",
+        "active_transactions",
+        "waiting_locks",
+        "total_locks",
+        "connection_utilization",
+        "total_connections",
+        "blocked_sessions",
+        "active_users",
+        "mean_latency_ms",
+        "deadlock_delta",
+        "failure_rate",
+        "booking_success_rate",
+        "conflict_rate",
+        "timeout_rate"
+      ],
+      "repeat": 2,
+      "top_k_pr_auc": {
+        "12": 0.9391776786774509,
+        "18": 0.9393900849036064,
+        "3": 0.927048302568232,
+        "6": 0.9377912555488447,
+        "9": 0.939203706347071
+      }
+    },
+    {
+      "evaluation_experiment_count": 11,
+      "fit_experiment_count": 40,
+      "fold": 3,
+      "ranked_features": [
+        "hotspot_ratio",
+        "estimated_wait_age_ms",
+        "blocked_sessions",
+        "mean_latency_ms",
+        "configured_users",
+        "requests_per_sec",
+        "active_transactions",
+        "waiting_locks",
+        "total_locks",
+        "active_users",
+        "p95_latency_ms",
+        "total_connections",
+        "connection_utilization",
+        "deadlock_delta",
+        "failure_rate",
+        "booking_success_rate",
+        "conflict_rate",
+        "timeout_rate"
+      ],
+      "repeat": 2,
+      "top_k_pr_auc": {
+        "12": 0.9453235393393024,
+        "18": 0.945343229800383,
+        "3": 0.9116387047927017,
+        "6": 0.943637367910484,
+        "9": 0.9436384734992657
+      }
+    },
+    {
+      "evaluation_experiment_count": 10,
+      "fit_experiment_count": 41,
+      "fold": 4,
+      "ranked_features": [
+        "hotspot_ratio",
+        "configured_users",
+        "requests_per_sec",
+        "mean_latency_ms",
+        "estimated_wait_age_ms",
+        "blocked_sessions",
+        "p95_latency_ms",
+        "active_transactions",
+        "total_locks",
+        "active_users",
+        "total_connections",
+        "connection_utilization",
+        "waiting_locks",
+        "deadlock_delta",
+        "failure_rate",
+        "booking_success_rate",
+        "conflict_rate",
+        "timeout_rate"
+      ],
+      "repeat": 2,
+      "top_k_pr_auc": {
+        "12": 0.9741237096563005,
+        "18": 0.9740596935264639,
+        "3": 0.9549926612368226,
+        "6": 0.9724165470525299,
+        "9": 0.973637099396366
+      }
+    },
+    {
+      "evaluation_experiment_count": 10,
+      "fit_experiment_count": 41,
+      "fold": 5,
+      "ranked_features": [
+        "hotspot_ratio",
+        "p95_latency_ms",
+        "estimated_wait_age_ms",
+        "total_locks",
+        "requests_per_sec",
+        "configured_users",
+        "active_transactions",
+        "blocked_sessions",
+        "waiting_locks",
+        "total_connections",
+        "connection_utilization",
+        "active_users",
+        "mean_latency_ms",
+        "deadlock_delta",
+        "failure_rate",
+        "booking_success_rate",
+        "conflict_rate",
+        "timeout_rate"
+      ],
+      "repeat": 2,
+      "top_k_pr_auc": {
+        "12": 0.9198575549057594,
+        "18": 0.9195614562875527,
+        "3": 0.9009513674261787,
+        "6": 0.9181742632496509,
+        "9": 0.9193940288487494
+      }
+    },
+    {
+      "evaluation_experiment_count": 10,
+      "fit_experiment_count": 41,
+      "fold": 1,
+      "ranked_features": [
+        "hotspot_ratio",
+        "blocked_sessions",
+        "estimated_wait_age_ms",
+        "mean_latency_ms",
+        "total_locks",
+        "active_transactions",
+        "requests_per_sec",
+        "active_users",
+        "configured_users",
+        "total_connections",
+        "connection_utilization",
+        "p95_latency_ms",
+        "waiting_locks",
+        "deadlock_delta",
+        "failure_rate",
+        "booking_success_rate",
+        "conflict_rate",
+        "timeout_rate"
+      ],
+      "repeat": 3,
+      "top_k_pr_auc": {
+        "12": 0.9408603093923247,
+        "18": 0.940917007797686,
+        "3": 0.8999371762689227,
+        "6": 0.9421442734213987,
+        "9": 0.9421483377451383
+      }
+    },
+    {
+      "evaluation_experiment_count": 10,
+      "fit_experiment_count": 41,
+      "fold": 2,
+      "ranked_features": [
+        "hotspot_ratio",
+        "p95_latency_ms",
+        "configured_users",
+        "estimated_wait_age_ms",
+        "total_locks",
+        "active_transactions",
+        "requests_per_sec",
+        "waiting_locks",
+        "total_connections",
+        "connection_utilization",
+        "active_users",
+        "blocked_sessions",
+        "mean_latency_ms",
+        "deadlock_delta",
+        "failure_rate",
+        "booking_success_rate",
+        "conflict_rate",
+        "timeout_rate"
+      ],
+      "repeat": 3,
+      "top_k_pr_auc": {
+        "12": 0.9422495051934365,
+        "18": 0.9426484483457641,
+        "3": 0.9231280365313251,
+        "6": 0.9418877522504059,
+        "9": 0.9429190179153502
+      }
+    },
+    {
+      "evaluation_experiment_count": 10,
+      "fit_experiment_count": 41,
+      "fold": 3,
+      "ranked_features": [
+        "hotspot_ratio",
+        "requests_per_sec",
+        "configured_users",
+        "estimated_wait_age_ms",
+        "active_transactions",
+        "mean_latency_ms",
+        "blocked_sessions",
+        "total_locks",
+        "p95_latency_ms",
+        "connection_utilization",
+        "total_connections",
+        "active_users",
+        "waiting_locks",
+        "deadlock_delta",
+        "failure_rate",
+        "booking_success_rate",
+        "conflict_rate",
+        "timeout_rate"
+      ],
+      "repeat": 3,
+      "top_k_pr_auc": {
+        "12": 0.9732469376197526,
+        "18": 0.9732174440922483,
+        "3": 0.9644077794890792,
+        "6": 0.971516886419743,
+        "9": 0.9727588458298055
+      }
+    },
+    {
+      "evaluation_experiment_count": 10,
+      "fit_experiment_count": 41,
+      "fold": 4,
+      "ranked_features": [
+        "hotspot_ratio",
+        "p95_latency_ms",
+        "estimated_wait_age_ms",
+        "active_transactions",
+        "total_locks",
+        "requests_per_sec",
+        "configured_users",
+        "blocked_sessions",
+        "waiting_locks",
+        "total_connections",
+        "connection_utilization",
+        "active_users",
+        "mean_latency_ms",
+        "deadlock_delta",
+        "failure_rate",
+        "booking_success_rate",
+        "conflict_rate",
+        "timeout_rate"
+      ],
+      "repeat": 3,
+      "top_k_pr_auc": {
+        "12": 0.912842106808063,
+        "18": 0.9129288057171221,
+        "3": 0.8946309187371969,
+        "6": 0.9053627201117942,
+        "9": 0.9129985861703468
+      }
+    },
+    {
+      "evaluation_experiment_count": 11,
+      "fit_experiment_count": 40,
+      "fold": 5,
+      "ranked_features": [
+        "hotspot_ratio",
+        "estimated_wait_age_ms",
+        "configured_users",
+        "mean_latency_ms",
+        "blocked_sessions",
+        "requests_per_sec",
+        "active_transactions",
+        "waiting_locks",
+        "p95_latency_ms",
+        "total_locks",
+        "total_connections",
+        "connection_utilization",
+        "active_users",
+        "deadlock_delta",
+        "failure_rate",
+        "booking_success_rate",
+        "conflict_rate",
+        "timeout_rate"
+      ],
+      "repeat": 3,
+      "top_k_pr_auc": {
+        "12": 0.9298254290293473,
+        "18": 0.9299630615130883,
+        "3": 0.8943751509971634,
+        "6": 0.9277066150171602,
+        "9": 0.9291262369492281
+      }
+    },
+    {
+      "evaluation_experiment_count": 10,
+      "fit_experiment_count": 41,
+      "fold": 1,
+      "ranked_features": [
+        "hotspot_ratio",
+        "blocked_sessions",
+        "configured_users",
+        "active_transactions",
+        "estimated_wait_age_ms",
+        "total_locks",
+        "p95_latency_ms",
+        "requests_per_sec",
+        "total_connections",
+        "connection_utilization",
+        "mean_latency_ms",
+        "active_users",
+        "waiting_locks",
+        "deadlock_delta",
+        "failure_rate",
+        "booking_success_rate",
+        "conflict_rate",
+        "timeout_rate"
+      ],
+      "repeat": 4,
+      "top_k_pr_auc": {
+        "12": 0.9245551613639111,
+        "18": 0.9246738309472727,
+        "3": 0.9133474857495381,
+        "6": 0.9233611843493856,
+        "9": 0.9246753613816452
+      }
+    },
+    {
+      "evaluation_experiment_count": 10,
+      "fit_experiment_count": 41,
+      "fold": 2,
+      "ranked_features": [
+        "hotspot_ratio",
+        "estimated_wait_age_ms",
+        "p95_latency_ms",
+        "requests_per_sec",
+        "configured_users",
+        "mean_latency_ms",
+        "total_locks",
+        "blocked_sessions",
+        "active_transactions",
+        "waiting_locks",
+        "total_connections",
+        "connection_utilization",
+        "active_users",
+        "deadlock_delta",
+        "failure_rate",
+        "booking_success_rate",
+        "conflict_rate",
+        "timeout_rate"
+      ],
+      "repeat": 4,
+      "top_k_pr_auc": {
+        "12": 0.9401718157706641,
+        "18": 0.9403764149584646,
+        "3": 0.9162147761787987,
+        "6": 0.936847598294204,
+        "9": 0.940185242051804
+      }
+    },
+    {
+      "evaluation_experiment_count": 11,
+      "fit_experiment_count": 40,
+      "fold": 3,
+      "ranked_features": [
+        "hotspot_ratio",
+        "active_transactions",
+        "configured_users",
+        "total_locks",
+        "p95_latency_ms",
+        "waiting_locks",
+        "requests_per_sec",
+        "estimated_wait_age_ms",
+        "blocked_sessions",
+        "total_connections",
+        "connection_utilization",
+        "mean_latency_ms",
+        "active_users",
+        "deadlock_delta",
+        "failure_rate",
+        "booking_success_rate",
+        "conflict_rate",
+        "timeout_rate"
+      ],
+      "repeat": 4,
+      "top_k_pr_auc": {
+        "12": 0.9579603204593343,
+        "18": 0.9580817114357313,
+        "3": 0.9506021161448985,
+        "6": 0.9519400426801234,
+        "9": 0.9576436959429818
+      }
+    },
+    {
+      "evaluation_experiment_count": 10,
+      "fit_experiment_count": 41,
+      "fold": 4,
+      "ranked_features": [
+        "hotspot_ratio",
+        "estimated_wait_age_ms",
+        "configured_users",
+        "active_users",
+        "requests_per_sec",
+        "p95_latency_ms",
+        "blocked_sessions",
+        "mean_latency_ms",
+        "total_connections",
+        "connection_utilization",
+        "active_transactions",
+        "total_locks",
+        "waiting_locks",
+        "deadlock_delta",
+        "failure_rate",
+        "booking_success_rate",
+        "conflict_rate",
+        "timeout_rate"
+      ],
+      "repeat": 4,
+      "top_k_pr_auc": {
+        "12": 0.9397997897738994,
+        "18": 0.9396080881108085,
+        "3": 0.9120175611149289,
+        "6": 0.9399374251713113,
+        "9": 0.9389798240500973
+      }
+    },
+    {
+      "evaluation_experiment_count": 10,
+      "fit_experiment_count": 41,
+      "fold": 5,
+      "ranked_features": [
+        "hotspot_ratio",
+        "estimated_wait_age_ms",
+        "requests_per_sec",
+        "configured_users",
+        "total_locks",
+        "active_transactions",
+        "blocked_sessions",
+        "p95_latency_ms",
+        "mean_latency_ms",
+        "total_connections",
+        "connection_utilization",
+        "waiting_locks",
+        "active_users",
+        "deadlock_delta",
+        "failure_rate",
+        "booking_success_rate",
+        "conflict_rate",
+        "timeout_rate"
+      ],
+      "repeat": 4,
+      "top_k_pr_auc": {
+        "12": 0.9445624521249794,
+        "18": 0.9450075279253488,
+        "3": 0.911568141792273,
+        "6": 0.9439913846585533,
+        "9": 0.9446136841572793
+      }
+    },
+    {
+      "evaluation_experiment_count": 10,
+      "fit_experiment_count": 41,
+      "fold": 1,
+      "ranked_features": [
+        "hotspot_ratio",
+        "blocked_sessions",
+        "configured_users",
+        "mean_latency_ms",
+        "estimated_wait_age_ms",
+        "active_transactions",
+        "total_locks",
+        "requests_per_sec",
+        "total_connections",
+        "connection_utilization",
+        "p95_latency_ms",
+        "active_users",
+        "waiting_locks",
+        "deadlock_delta",
+        "failure_rate",
+        "booking_success_rate",
+        "conflict_rate",
+        "timeout_rate"
+      ],
+      "repeat": 5,
+      "top_k_pr_auc": {
+        "12": 0.9220072102320058,
+        "18": 0.9218851043388447,
+        "3": 0.9158493782235253,
+        "6": 0.9196970335423635,
+        "9": 0.9222085949319044
+      }
+    },
+    {
+      "evaluation_experiment_count": 11,
+      "fit_experiment_count": 40,
+      "fold": 2,
+      "ranked_features": [
+        "hotspot_ratio",
+        "configured_users",
+        "active_transactions",
+        "total_locks",
+        "estimated_wait_age_ms",
+        "waiting_locks",
+        "blocked_sessions",
+        "requests_per_sec",
+        "connection_utilization",
+        "total_connections",
+        "p95_latency_ms",
+        "active_users",
+        "mean_latency_ms",
+        "deadlock_delta",
+        "failure_rate",
+        "booking_success_rate",
+        "conflict_rate",
+        "timeout_rate"
+      ],
+      "repeat": 5,
+      "top_k_pr_auc": {
+        "12": 0.9603985739104759,
+        "18": 0.9602509937726347,
+        "3": 0.955389364480519,
+        "6": 0.9570345829947114,
+        "9": 0.961820713515741
+      }
+    },
+    {
+      "evaluation_experiment_count": 10,
+      "fit_experiment_count": 41,
+      "fold": 3,
+      "ranked_features": [
+        "hotspot_ratio",
+        "mean_latency_ms",
+        "p95_latency_ms",
+        "requests_per_sec",
+        "total_locks",
+        "active_transactions",
+        "configured_users",
+        "estimated_wait_age_ms",
+        "blocked_sessions",
+        "active_users",
+        "total_connections",
+        "connection_utilization",
+        "waiting_locks",
+        "deadlock_delta",
+        "failure_rate",
+        "booking_success_rate",
+        "conflict_rate",
+        "timeout_rate"
+      ],
+      "repeat": 5,
+      "top_k_pr_auc": {
+        "12": 0.9583243296896415,
+        "18": 0.958282892374097,
+        "3": 0.9512287529029064,
+        "6": 0.9487168751066983,
+        "9": 0.9584421784745192
+      }
+    },
+    {
+      "evaluation_experiment_count": 10,
+      "fit_experiment_count": 41,
+      "fold": 4,
+      "ranked_features": [
+        "hotspot_ratio",
+        "estimated_wait_age_ms",
+        "p95_latency_ms",
+        "configured_users",
+        "active_transactions",
+        "blocked_sessions",
+        "active_users",
+        "requests_per_sec",
+        "total_locks",
+        "total_connections",
+        "connection_utilization",
+        "waiting_locks",
+        "mean_latency_ms",
+        "deadlock_delta",
+        "failure_rate",
+        "booking_success_rate",
+        "conflict_rate",
+        "timeout_rate"
+      ],
+      "repeat": 5,
+      "top_k_pr_auc": {
+        "12": 0.9310348239722007,
+        "18": 0.9312816770029009,
+        "3": 0.9299745100992847,
+        "6": 0.929348444298373,
+        "9": 0.9329888842508678
+      }
+    },
+    {
+      "evaluation_experiment_count": 10,
+      "fit_experiment_count": 41,
+      "fold": 5,
+      "ranked_features": [
+        "hotspot_ratio",
+        "p95_latency_ms",
+        "estimated_wait_age_ms",
+        "requests_per_sec",
+        "configured_users",
+        "mean_latency_ms",
+        "active_transactions",
+        "waiting_locks",
+        "blocked_sessions",
+        "total_locks",
+        "active_users",
+        "total_connections",
+        "connection_utilization",
+        "deadlock_delta",
+        "failure_rate",
+        "booking_success_rate",
+        "conflict_rate",
+        "timeout_rate"
+      ],
+      "repeat": 5,
+      "top_k_pr_auc": {
+        "12": 0.9294132189425927,
+        "18": 0.9294305598861016,
+        "3": 0.9129579211875763,
+        "6": 0.9256762020775736,
+        "9": 0.9284128817149995
+      }
+    }
+  ],
+  "interpretation_boundary": {
+    "feature_selection_performed_inside_fit_fold": true,
+    "full_18_feature_model_remains_the_deployed_model": true,
+    "model_retrained_for_deployment": false,
+    "test_split_used": false
+  },
+  "method": {
+    "evaluation_metric": "pr_auc",
+    "feature_ranking_method": "absolute standardized logistic-regression coefficient, learned inside each fit fold",
+    "model": "logistic_regression",
+    "repeats": 5,
+    "splits_per_repeat": 5,
+    "splitter": "StratifiedGroupKFold",
+    "top_k_values": [
+      3,
+      6,
+      9,
+      12,
+      18
+    ],
+    "total_grouped_evaluations": 25
+  },
+  "purpose": "Assess whether smaller top-k feature subsets retain the ranking performance of the approved 18-feature model.",
+  "schema_version": "1.0.0",
+  "top_k_results": {
+    "12": {
+      "maximum": 0.9741237096563005,
+      "mean": 0.940564761896785,
+      "minimum": 0.912842106808063,
+      "standard_deviation": 0.01714231177237112
+    },
+    "18": {
+      "maximum": 0.9740596935264639,
+      "mean": 0.9405598205543604,
+      "minimum": 0.9129288057171221,
+      "standard_deviation": 0.017153064488778912
+    },
+    "3": {
+      "maximum": 0.9644077794890792,
+      "mean": 0.9235734818187967,
+      "minimum": 0.8943751509971634,
+      "standard_deviation": 0.020746371987803953
+    },
+    "6": {
+      "maximum": 0.9724165470525299,
+      "mean": 0.9379308845138311,
+      "minimum": 0.9053627201117942,
+      "standard_deviation": 0.01736378302351849
+    },
+    "9": {
+      "maximum": 0.973637099396366,
+      "mean": 0.9400900430323992,
+      "minimum": 0.9122917141141151,
+      "standard_deviation": 0.01749243503580481
+    }
+  }
+}
