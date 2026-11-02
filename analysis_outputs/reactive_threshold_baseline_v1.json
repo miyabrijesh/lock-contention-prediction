@@ -1,0 +1,59 @@
+{
+  "analysis_name": "reactive_waiting_lock_threshold_baseline",
+  "interpretation_boundary": {
+    "baseline_is_reactive_not_probabilistic": true,
+    "baseline_uses_only_current_telemetry": true,
+    "test_observations_within_experiments_are_temporally_dependent": true,
+    "test_split_used_for_threshold_selection": false
+  },
+  "purpose": "Provide a simple threshold-based monitoring baseline for comparison with the learned future-risk predictor.",
+  "rule": {
+    "alert_condition": "waiting_locks >= 1",
+    "feature": "waiting_locks",
+    "threshold_selection_metric": "validation_f2",
+    "threshold_selection_split": "validation",
+    "tie_break_order": [
+      "f2",
+      "recall",
+      "precision",
+      "lower_threshold"
+    ]
+  },
+  "schema_version": "1.0.0",
+  "test": {
+    "experiment_count": 9,
+    "metrics": {
+      "accuracy": 0.8582089552238806,
+      "balanced_accuracy": 0.8597374847374848,
+      "confusion_matrix": {
+        "false_negative": 35,
+        "false_positive": 22,
+        "true_negative": 146,
+        "true_positive": 199
+      },
+      "f2": 0.8599827139152982,
+      "precision": 0.9004524886877828,
+      "recall": 0.8504273504273504,
+      "specificity": 0.8690476190476191
+    },
+    "row_count": 402
+  },
+  "validation": {
+    "experiment_count": 9,
+    "metrics": {
+      "accuracy": 0.8025,
+      "balanced_accuracy": 0.8084388837400887,
+      "confusion_matrix": {
+        "false_negative": 53,
+        "false_positive": 26,
+        "true_negative": 140,
+        "true_positive": 181
+      },
+      "f2": 0.7917760279965005,
+      "precision": 0.8743961352657005,
+      "recall": 0.7735042735042735,
+      "specificity": 0.8433734939759037
+    },
+    "row_count": 400
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "analysis_name": "experiment_clustered_bootstrap_test_metrics",
+  "confidence_intervals_95": {
+    "accuracy": {
+      "lower": 0.6867167919799498,
+      "upper": 0.9801980198019802
+    },
+    "average_precision": {
+      "lower": 0.8858656084577452,
+      "upper": 0.9999999999999999
+    },
+    "precision": {
+      "lower": 0.5507246376811594,
+      "upper": 0.9775280898876404
+    },
+    "recall": {
+      "lower": 0.9120879120879121,
+      "upper": 1.0
+    }
+  },
+  "dataset": {
+    "assignment_sha256": "4a24f55d3d1121f50da74ae3ec21cfba4a6f3f9044069edff7113d228c4c8374",
+    "experiment_count": 9,
+    "row_count": 402,
+    "split": "test"
+  },
+  "interpretation_boundary": {
+    "limited_number_of_test_experiments": 9,
+    "model_retrained": false,
+    "rows_within_each_resampled_experiment_remain_intact": true,
+    "test_split_used_for_model_selection": false,
+    "threshold_retuned": false
+  },
+  "method": {
+    "bootstrap_samples": 10000,
+    "clusters": "experiment_run_id",
+    "confidence_level": 0.95,
+    "interval_method": "percentile",
+    "random_seed": 20261102,
+    "resampling_method": "nonparametric_experiment_cluster_bootstrap"
+  },
+  "model": {
+    "classification_threshold": 0.34,
+    "model_name": "logistic_regression"
+  },
+  "point_estimates": {
+    "accuracy": 0.8532338308457711,
+    "average_precision": 0.982184729811235,
+    "precision": 0.8113879003558719,
+    "recall": 0.9743589743589743
+  },
+  "purpose": "Quantify frozen-test uncertainty while preserving within-experiment temporal dependence by resampling whole experiments.",
+  "schema_version": "1.0.0"
+}
